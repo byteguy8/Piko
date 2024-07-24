@@ -1,0 +1,85 @@
+#ifndef _TOKEN_H_
+#define _TOKEN_H_
+
+#include <stddef.h>
+
+typedef enum _token_type_
+{
+    PLUS_TOKTYPE,
+    MINUS_TOKTYPE,
+    ASTERISK_TOKTYPE,
+    SLASH_TOKTYPE,
+    PERCENT_TOKTYPE,
+
+    LESS_TOKTYPE,
+    GREATER_TOKTYPE,
+    LESS_EQUALS_TOKTYPE,
+    GREATER_EQUALS_TOKTYPE,
+    EQUALS_EQUALS_TOKTYPE,
+    NOT_EQUALS_TOKTYPE,
+
+    OR_TOKTYPE,
+    AND_TOKTYPE,
+    NOT_TOKTYPE,
+
+    LEFT_PARENTHESIS_TOKTYPE,
+    RIGHT_PARENTHESIS_TOKTYPE,
+    LEFT_SQUARE_TOKTYPE,
+    RIGHT_SQUARE_TOKTYPE,
+    LEFT_BRACKET_TOKTYPE,
+    RIGHT_BRACKET_TOKTYPE,
+
+    EQUALS_TOKTYPE,
+    EXCLAMATION_TOKTYPE,
+
+    COLON_TOKTYPE,
+    SEMICOLON_TOKTYPE,
+    COMMA_TOKTYPE,
+
+    // types
+    INTEGER_TOKTYPE,
+    STRING_TOKTYPE,
+
+    // keywords
+    NIL_TOKTYPE,
+    TRUE_TOKTYPE,
+    FALSE_TOKTYPE,
+    CL_TOKTYPE,
+    IF_TOKTYPE,
+    ELIF_TOKTYPE,
+    ELSE_TOKTYPE,
+    WHILE_TOKTYPE,
+    BREAK_TOKTYPE,
+    CONTINUE_TOKTYPE,
+    PRINT_TOKTYPE,
+    PROC_TOKTYPE,
+    RETURN_TOKTYPE,
+    
+    IS_TOKTYPE,
+    FROM_TOKTYPE,
+    BOOL_TOKTYPE,
+    INT_TOKTYPE,
+    STR_TOKTYPE,
+    ARR_TOKTYPE,
+    INSTANCE_TOKTYPE,
+    
+    CLASS_TOKTYPE,
+    INIT_TOKTYPE,
+    THIS_TOKTYPE,
+    DOT_TOKTYPE,
+
+    // others
+    EOF_TOKTYPE,
+    IDENTIFIER_TOKTYPE,
+} TokenType;
+
+typedef struct _token_
+{
+    int line;
+    char *lexeme;
+    void *literal;
+    size_t literal_size;
+    enum _token_type_ type;
+} Token;
+
+#endif
