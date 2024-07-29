@@ -58,58 +58,62 @@ typedef struct _from_expr_
 
 typedef struct _arr_expr_
 {
-    Expr *len_expr;
+    Token *left_square_token;
     DynArrPtr *items;
+    Expr *len_expr;
 } ArrExpr;
 
 typedef struct _logical_expr_
 {
     Expr *left;
-    Token *operator;
+    Token *operator_token;
     Expr *right;
 } LogicalExpr;
 
 typedef struct _comparison_expr_
 {
     Expr *left;
-    Token *operator;
+    Token *operator_token;
     Expr *right;
 } ComparisonExpr;
 
 typedef struct _binary_expr_
 {
     Expr *left;
-    Token *operator;
+    Token *operator_token;
     Expr *right;
 } BinaryExpr;
 
 typedef struct _unary_expr_
 {
-    Token *operator;
+    Token *operator_token;
     Expr *right;
 } UnaryExpr;
 
 typedef struct _arr_access_expr_
 {
     Expr *expr;
+    Token *left_square_token;
     Expr *index_expr;
 } ArrAccessExpr;
 
 typedef struct _access_expr_
 {
     Expr *left;
-    Token *identifier;
+    Token *dot_token;
+    Token *identifier_token;
 } AccessExpr;
 
 typedef struct _call_expr_
 {
     Expr *left;
+    Token *left_parenthesis_token;
     DynArrPtr *args;
 } CallExpr;
 
 typedef struct _this_expr_
 {
-    Token *thisToken;
+    Token *this_token;
     Token *identifier_token;
 } ThisExpr;
 
@@ -128,6 +132,7 @@ typedef struct _literal_expr_
 {
     void *literal;
     size_t literal_size;
+    Token *literal_token;
 } LiteralExpr;
 
 #endif

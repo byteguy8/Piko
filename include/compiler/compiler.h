@@ -13,7 +13,6 @@ typedef struct _symbol_
     int global;
     int local;
     int depth;
-    void *load;
     char *identifier;
     int is_entity;   // a function or a class
     int class_bound; // declared as member (function or attribute) of a class

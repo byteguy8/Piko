@@ -355,12 +355,13 @@ void memory_destroy_from_expr(FromExpr *expr)
     memory_dealloc(expr);
 }
 
-ArrExpr *memory_create_arr_expr(Expr *len_expr, DynArrPtr *items)
+ArrExpr *memory_create_arr_expr(Token *left_square_token, DynArrPtr *items, Expr *len_expr)
 {
     ArrExpr *expr = (ArrExpr *)memory_alloc(sizeof(ArrExpr));
 
-    expr->len_expr = len_expr;
+    expr->left_square_token = left_square_token;
     expr->items = items;
+    expr->len_expr = len_expr;
 
     return expr;
 }
@@ -370,7 +371,7 @@ void memory_destroy_arr_expr(ArrExpr *expr)
     if (!expr)
         return;
 
-    expr->items = NULL;
+    memset(expr, 0, sizeof(ArrExpr));
 
     memory_dealloc(expr);
 }
@@ -380,7 +381,7 @@ LogicalExpr *memory_create_logical_expr(Expr *left, Token *operator, Expr * righ
     LogicalExpr *expr = (LogicalExpr *)memory_alloc(sizeof(LogicalExpr));
 
     expr->left = left;
-    expr->operator= operator;
+    expr->operator_token = operator;
     expr->right = right;
 
     return expr;
@@ -392,7 +393,7 @@ void memory_destroy_logical_expr(LogicalExpr *expr)
         return;
 
     expr->left = NULL;
-    expr->operator= NULL;
+    expr->operator_token = NULL;
     expr->right = NULL;
 
     memory_dealloc(expr);
@@ -403,7 +404,7 @@ ComparisonExpr *memory_create_comparison_expr(Expr *left, Token *operator, Expr 
     ComparisonExpr *expr = (ComparisonExpr *)memory_alloc(sizeof(ComparisonExpr));
 
     expr->left = left;
-    expr->operator= operator;
+    expr->operator_token = operator;
     expr->right = right;
 
     return expr;
@@ -415,7 +416,7 @@ void memory_destroy_comparison_expr(ComparisonExpr *expr)
         return;
 
     expr->left = NULL;
-    expr->operator= NULL;
+    expr->operator_token = NULL;
     expr->right = NULL;
 
     memory_dealloc(expr);
@@ -426,7 +427,7 @@ BinaryExpr *memory_create_binary_expr(Expr *left, Token *operator, Expr * right)
     BinaryExpr *expr = (BinaryExpr *)memory_alloc(sizeof(BinaryExpr));
 
     expr->left = left;
-    expr->operator= operator;
+    expr->operator_token = operator;
     expr->right = right;
 
     return expr;
@@ -438,7 +439,7 @@ void memory_destroy_binary_expr(BinaryExpr *expr)
         return;
 
     expr->left = NULL;
-    expr->operator= NULL;
+    expr->operator_token = NULL;
     expr->right = NULL;
 
     memory_dealloc(expr);
@@ -448,7 +449,7 @@ UnaryExpr *memory_create_unary_expr(Token *operator, Expr * right)
 {
     UnaryExpr *expr = (UnaryExpr *)memory_alloc(sizeof(UnaryExpr));
 
-    expr->operator= operator;
+    expr->operator_token = operator;
     expr->right = right;
 
     return expr;
@@ -459,17 +460,18 @@ void memory_destroy_unary_expr(UnaryExpr *expr)
     if (!expr)
         return;
 
-    expr->operator= NULL;
+    expr->operator_token = NULL;
     expr->right = NULL;
 
     memory_dealloc(expr);
 }
 
-ArrAccessExpr *memory_create_arr_access_expr(Expr *expr, Expr *index_expr)
+ArrAccessExpr *memory_create_arr_access_expr(Expr *expr, Token *left_square_token, Expr *index_expr)
 {
     ArrAccessExpr *e = (ArrAccessExpr *)memory_alloc(sizeof(ArrAccessExpr));
 
     e->expr = expr;
+    e->left_square_token = left_square_token;
     e->index_expr = index_expr;
 
     return e;
@@ -480,18 +482,18 @@ void memory_destroy_arr_access_expr(ArrAccessExpr *expr)
     if (!expr)
         return;
 
-    expr->expr = NULL;
-    expr->index_expr = NULL;
+    memset(expr, 0, sizeof(ArrAccessExpr));
 
     memory_dealloc(expr);
 }
 
-AccessExpr *memory_create_access_expr(Expr *left, Token *identifier)
+AccessExpr *memory_create_access_expr(Expr *left, Token *dot_token, Token *identifier)
 {
     AccessExpr *expr = (AccessExpr *)memory_alloc(sizeof(AccessExpr));
 
     expr->left = left;
-    expr->identifier = identifier;
+    expr->dot_token = dot_token;
+    expr->identifier_token = identifier;
 
     return expr;
 }
@@ -501,17 +503,17 @@ void memory_destroy_access_expr(AccessExpr *expr)
     if (!expr)
         return;
 
-    expr->left = NULL;
-    expr->identifier = NULL;
+    memset(expr, 0, sizeof(AccessExpr));
 
     memory_dealloc(expr);
 }
 
-CallExpr *memory_create_call_expr(Expr *left, DynArrPtr *args)
+CallExpr *memory_create_call_expr(Expr *left, Token *left_parenthesis_token, DynArrPtr *args)
 {
     CallExpr *expr = (CallExpr *)memory_alloc(sizeof(CallExpr));
 
     expr->left = left;
+    expr->left_parenthesis_token = left_parenthesis_token;
     expr->args = args;
 
     return expr;
@@ -522,8 +524,7 @@ void memory_destroy_call_expr(CallExpr *expr)
     if (!expr)
         return;
 
-    expr->left = NULL;
-    expr->args = NULL;
+    memset(expr, 0, sizeof(CallExpr));
 
     memory_dealloc(expr);
 }
@@ -532,7 +533,7 @@ ThisExpr *memory_create_this_expr(Token *thisToken, Token *IdentifierExpr)
 {
     ThisExpr *expr = (ThisExpr *)memory_alloc(sizeof(ThisExpr));
 
-    expr->thisToken = thisToken;
+    expr->this_token = thisToken;
     expr->identifier_token = IdentifierExpr;
 
     return expr;
@@ -543,7 +544,7 @@ void memory_destroy_this_expr(ThisExpr *expr)
     if (!expr)
         return;
 
-    expr->thisToken = NULL;
+    expr->this_token = NULL;
     expr->identifier_token = NULL;
 
     memory_dealloc(expr);
@@ -589,12 +590,13 @@ void memory_destroy_group_expr(GroupExpr *expr)
     memory_dealloc(expr);
 }
 
-LiteralExpr *memory_create_literal_expr(void *literal, size_t literal_size)
+LiteralExpr *memory_create_literal_expr(void *literal, size_t literal_size, Token *literal_token)
 {
     LiteralExpr *expr = (LiteralExpr *)memory_alloc(sizeof(LiteralExpr));
 
     expr->literal = literal;
     expr->literal_size = literal_size;
+    expr->literal_token = literal_token;
 
     return expr;
 }
@@ -604,8 +606,7 @@ void memory_destroy_literal_expr(LiteralExpr *expr)
     if (!expr)
         return;
 
-    expr->literal = NULL;
-    expr->literal_size = 0;
+    memset(expr, 0, sizeof(LiteralExpr));
 
     memory_dealloc(expr);
 }
@@ -646,8 +647,7 @@ void memory_destroy_stmt(Stmt *stmt)
     if (!stmt)
         return;
 
-    stmt->s = NULL;
-    stmt->type = 0;
+    memset(stmt, 0, sizeof(Stmt));
 
     memory_dealloc(stmt);
 }
@@ -667,8 +667,7 @@ void memory_destroy_var_decl_stmt(VarDeclStmt *stmt)
     if (!stmt)
         return;
 
-    stmt->identifier = NULL;
-    stmt->initializer = NULL;
+    memset(stmt, 0, sizeof(VarDeclStmt));
 
     memory_dealloc(stmt);
 }
@@ -686,7 +685,7 @@ void memory_destroy_block_stmt(BlockStmt *stmt)
     if (!stmt)
         return;
 
-    stmt->stmts = NULL;
+    memset(stmt, 0, sizeof(BlockStmt));
 
     memory_dealloc(stmt);
 }
@@ -706,8 +705,7 @@ void memory_destroy_if_stmts_branch(IfStmtBranch *stmt)
     if (!stmt)
         return;
 
-    stmt->condition = NULL;
-    stmt->stmts = NULL;
+    memset(stmt, 0, sizeof(IfStmtBranch));
 
     memory_dealloc(stmt);
 }
@@ -728,9 +726,7 @@ void memory_destroy_if_stmt(IfStmt *stmt)
     if (!stmt)
         return;
 
-    stmt->if_branch = NULL;
-    stmt->elif_branches = NULL;
-    stmt->else_stmts = NULL;
+    memset(stmt, 0, sizeof(IfStmt));
 
     memory_dealloc(stmt);
 }
@@ -749,7 +745,7 @@ void memory_destroy_continue_stmt(ContinueStmt *stmt)
     if (!stmt)
         return;
 
-    stmt->continue_token = NULL;
+    memset(stmt, 0, sizeof(ContinueStmt));
 
     memory_dealloc(stmt);
 }
@@ -768,7 +764,7 @@ void memory_destroy_break_stmt(BreakStmt *stmt)
     if (!stmt)
         return;
 
-    stmt->break_token = NULL;
+    memset(stmt, 0, sizeof(BreakStmt));
 
     memory_dealloc(stmt);
 }
@@ -788,8 +784,7 @@ void memory_destroy_whiles_stmt(WhileStmt *stmt)
     if (!stmt)
         return;
 
-    stmt->condition = NULL;
-    stmt->stmts = NULL;
+    memset(stmt, 0, sizeof(WhileStmt));
 
     memory_dealloc(stmt);
 }
@@ -810,9 +805,7 @@ void memory_destroy_fn_stmt(FnStmt *stmt)
     if (!stmt)
         return;
 
-    stmt->identifier_token = NULL;
-    stmt->params = NULL;
-    stmt->stmts = NULL;
+    memset(stmt, 0, sizeof(FnStmt));
 
     memory_dealloc(stmt);
 }
@@ -834,10 +827,7 @@ void memory_destroy_class(ClassStmt *stmt)
     if (!stmt)
         return;
 
-    stmt->identifier = NULL;
-    stmt->attributes = NULL;
-    stmt->constructor = NULL;
-    stmt->methods = NULL;
+    memset(stmt, 0, sizeof(ClassStmt));
 
     memory_dealloc(stmt);
 }
@@ -857,8 +847,7 @@ void memory_destroy_print_stmt(PrintStmt *stmt)
     if (!stmt)
         return;
 
-    stmt->expr = NULL;
-    stmt->print_token = NULL;
+    memset(stmt, 0, sizeof(PrintStmt));
 
     memory_dealloc(stmt);
 }
@@ -878,8 +867,7 @@ void memory_destroy_return_stmt(ReturnStmt *stmt)
     if (!stmt)
         return;
 
-    stmt->value = NULL;
-    stmt->return_token = NULL;
+    memset(stmt, 0, sizeof(ReturnStmt));
 
     memory_dealloc(stmt);
 }
@@ -898,7 +886,7 @@ void memory_destroy_expr_stmt(ExprStmt *stmt)
     if (!stmt)
         return;
 
-    stmt->expr = NULL;
+    memset(stmt, 0, sizeof(ExprStmt));
 
     memory_dealloc(stmt);
 }
@@ -922,9 +910,7 @@ void memory_destroy_scanner(Scanner *scanner)
     if (!scanner)
         return;
 
-    scanner->start = 0;
-    scanner->current = 0;
-    scanner->tokens = NULL;
+    memset(scanner, 0, sizeof(Scanner));
 
     memory_dealloc(scanner);
 }
@@ -945,24 +931,20 @@ void memory_destroy_parser(Parser *parser)
     if (!parser)
         return;
 
-    parser->current = 0;
-    parser->tokens = NULL;
-    parser->stmts = NULL;
+    memset(parser, 0, sizeof(Parser));
 
     memory_dealloc(parser);
 }
 
-Symbol *memory_create_symbol(int global, int index, int depth, char *identifier, int is_fn, int class_bound)
+Symbol *memory_create_symbol(int global, int local, int depth, char *identifier, int is_entity, int class_bound)
 {
     Symbol *symbol = (Symbol *)memory_alloc(sizeof(Symbol));
 
     symbol->global = global;
-    symbol->local = index;
+    symbol->local = local;
     symbol->depth = depth;
-    symbol->class_bound = 0;
-    symbol->load = NULL;
     symbol->identifier = identifier;
-    symbol->is_entity = is_fn;
+    symbol->is_entity = is_entity;
     symbol->class_bound = class_bound;
     symbol->next = NULL;
 
@@ -974,12 +956,7 @@ void memory_destroy_symbol(Symbol *symbol)
     if (!symbol)
         return;
 
-    symbol->global = 0;
-    symbol->local = 0;
-    symbol->depth = 0;
-    symbol->class_bound = 0;
-    symbol->load = NULL;
-    symbol->next = NULL;
+    memset(symbol, 0, sizeof(Symbol));
 
     memory_dealloc(symbol);
 }

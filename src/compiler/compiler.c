@@ -46,7 +46,7 @@ void compiler_arr_access(ArrAccessExpr *expr);
 void compiler_access(AccessExpr *expr);
 void compiler_call_expr(CallExpr *expr);
 void compiler_this_expr(ThisExpr *expr);
-void compiler_nil_expr();
+void compiler_nil_expr(LiteralExpr *expr);
 void compiler_bool_expr(LiteralExpr *expr);
 void compiler_int_expr(LiteralExpr *expr);
 void compiler_str_expr(LiteralExpr *expr);
@@ -221,7 +221,7 @@ void compiler_assign_expr(AssignExpr *expr)
     if (left->type == ACCESS_EXPR_TYPE)
     {
         AccessExpr *access_expr = (AccessExpr *)left->e;
-        Token *identifier_token = access_expr->identifier;
+        Token *identifier_token = access_expr->identifier_token;
         char *identifier = identifier_token->lexeme;
 
         compiler_expr(right);
@@ -387,7 +387,7 @@ void compiler_logical_expr(LogicalExpr *expr)
     compiler_expr(expr->left);
     compiler_expr(expr->right);
 
-    Token *operator= expr->operator;
+    Token *operator= expr->operator_token;
 
     switch (operator->type)
     {
@@ -409,7 +409,7 @@ void compiler_comparison_expr(ComparisonExpr *expr)
     compiler_expr(expr->left);
     compiler_expr(expr->right);
 
-    Token *operator= expr->operator;
+    Token *operator= expr->operator_token;
 
     switch (operator->type)
     {
@@ -447,7 +447,7 @@ void compiler_binary_expr(BinaryExpr *expr)
     compiler_expr(expr->left);
     compiler_expr(expr->right);
 
-    Token *operator= expr->operator;
+    Token *operator= expr->operator_token;
 
     switch (operator->type)
     {
@@ -480,7 +480,7 @@ void compiler_unary_expr(UnaryExpr *expr)
 {
     compiler_expr(expr->right);
 
-    Token *operator= expr->operator;
+    Token *operator= expr->operator_token;
 
     switch (operator->type)
     {
@@ -507,7 +507,7 @@ void compiler_arr_access(ArrAccessExpr *expr)
 void compiler_access(AccessExpr *expr)
 {
     Expr *left = expr->left;
-    Token *identifier = expr->identifier;
+    Token *identifier = expr->identifier_token;
 
     compiler_expr(left);
 
@@ -537,7 +537,7 @@ void compiler_this_expr(ThisExpr *expr)
     int klass_scope = compiler_scope_inside_klass();
 
     if (klass_scope == -1)
-        compiler_error_at(expr->thisToken, "'this' expressions can only be used inside classes.");
+        compiler_error_at(expr->this_token, "'this' expressions can only be used inside classes.");
 
     vm_write_chunk(THIS_OPC, COMPILER_VM);
 
@@ -552,7 +552,7 @@ void compiler_this_expr(ThisExpr *expr)
     }
 }
 
-void compiler_nil_expr()
+void compiler_nil_expr(LiteralExpr *expr)
 {
     vm_write_chunk(NIL_OPC, COMPILER_VM);
 }
@@ -684,7 +684,7 @@ void compiler_expr(Expr *expr)
         break;
 
     case NIL_EXPR_TYPE:
-        compiler_nil_expr();
+        compiler_nil_expr((LiteralExpr *)expr->e);
         break;
 
     case BOOL_EXPR_TYPE:

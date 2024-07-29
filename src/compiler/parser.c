@@ -236,8 +236,9 @@ Expr *parser_arr_expr(Parser *parser)
 {
     if (parser_match(parser, 1, LEFT_SQUARE_TOKTYPE))
     {
-        Expr *len_expr = NULL;
+        Token *left_square_token = memory_clone_token(parser_previous(parser));
         DynArrPtr *items = memory_create_dynarr_ptr();
+        Expr *len_expr = NULL;
 
         if (!parser_check(parser, RIGHT_SQUARE_TOKTYPE))
         {
@@ -252,7 +253,7 @@ Expr *parser_arr_expr(Parser *parser)
         if (parser_match(parser, 1, COLON_TOKTYPE))
             len_expr = parser_expr(parser);
 
-        ArrExpr *expr = memory_create_arr_expr(len_expr, items);
+        ArrExpr *expr = memory_create_arr_expr(left_square_token, items, len_expr);
 
         return memory_create_expr(expr, ARR_EXPR_TYPE);
     }
@@ -384,7 +385,8 @@ Expr *parser_access_expr(Parser *parser)
             do
             {
                 Expr *index_expr = parser_factor_expr(parser);
-                ArrAccessExpr *expr = memory_create_arr_access_expr(left, index_expr);
+                Token *left_square_index = memory_clone_token(previous);
+                ArrAccessExpr *expr = memory_create_arr_access_expr(left, left_square_index, index_expr);
 
                 left = memory_create_expr(expr, ARR_ACCESS_EXPR_TYPE);
 
@@ -397,10 +399,11 @@ Expr *parser_access_expr(Parser *parser)
 
         case DOT_TOKTYPE:
         {
+            Token *dot_token = memory_clone_token(previous);
             Token *raw_identifier = parser_consume(parser, IDENTIFIER_TOKTYPE, "Expect identifier after '.'.");
             Token *identifier = memory_clone_token(raw_identifier);
 
-            AccessExpr *expr = memory_create_access_expr(left, identifier);
+            AccessExpr *expr = memory_create_access_expr(left, dot_token, identifier);
 
             left = memory_create_expr(expr, ACCESS_EXPR_TYPE);
 
@@ -409,6 +412,7 @@ Expr *parser_access_expr(Parser *parser)
 
         case LEFT_PARENTHESIS_TOKTYPE:
         {
+            Token *left_parenthesis_token = memory_clone_token(previous);
             DynArrPtr *args = memory_create_dynarr_ptr();
 
             if (!parser_check(parser, RIGHT_PARENTHESIS_TOKTYPE))
@@ -422,7 +426,7 @@ Expr *parser_access_expr(Parser *parser)
 
             parser_consume(parser, RIGHT_PARENTHESIS_TOKTYPE, "Expect ')' at end of call expression argument list.");
 
-            CallExpr *expr = memory_create_call_expr(left, args);
+            CallExpr *expr = memory_create_call_expr(left, left_parenthesis_token, args);
 
             left = memory_create_expr(expr, CALL_EXPR_TYPE);
 
@@ -459,50 +463,52 @@ Expr *parser_this_expr(Parser *parser)
 Expr *parser_literal_expr(Parser *parser)
 {
     if (parser_match(parser, 1, NIL_TOKTYPE))
-        return memory_create_expr(NULL, NIL_EXPR_TYPE);
+    {
+        Token *literal_token = memory_clone_token(parser_previous(parser));
+
+        LiteralExpr *expr = memory_create_literal_expr(NULL, 0, literal_token);
+
+        return memory_create_expr(expr, NIL_EXPR_TYPE);
+    }
 
     if (parser_match(parser, 2, TRUE_TOKTYPE, FALSE_TOKTYPE))
     {
-        Token *token = parser_previous(parser);
-
+        Token *literal_token = memory_clone_token(parser_previous(parser));
         int8_t *literal = (int8_t *)memory_alloc(sizeof(int8_t));
 
-        *literal = token->type == TRUE_TOKTYPE ? 1 : 0;
+        *literal = literal_token->type == TRUE_TOKTYPE ? 1 : 0;
 
-        LiteralExpr *expr = memory_create_literal_expr((void *)literal, sizeof(int8_t));
+        LiteralExpr *expr = memory_create_literal_expr((void *)literal, sizeof(int8_t), literal_token);
 
         return memory_create_expr(expr, BOOL_EXPR_TYPE);
     }
 
     if (parser_match(parser, 1, INTEGER_TOKTYPE))
     {
-        Token *token = parser_previous(parser);
-
+        Token *literal_token = memory_clone_token(parser_previous(parser));
         int64_t *literal = (int64_t *)memory_alloc(sizeof(int64_t));
 
-        *literal = *(int64_t *)token->literal;
+        *literal = *(int64_t *)literal_token->literal;
 
-        LiteralExpr *expr = memory_create_literal_expr(literal, token->literal_size);
+        LiteralExpr *expr = memory_create_literal_expr(literal, literal_token->literal_size, literal_token);
 
         return memory_create_expr(expr, INT_EXPR_TYPE);
     }
 
     if (parser_match(parser, 1, STRING_TOKTYPE))
     {
-        Token *token = parser_previous(parser);
+        Token *literal_token = memory_clone_token(parser_previous(parser));
+        char *literal = memory_clone_raw_str((char *)literal_token->literal);
 
-        char *literal = memory_clone_raw_str((char *)token->literal);
-
-        LiteralExpr *expr = memory_create_literal_expr(literal, token->literal_size);
+        LiteralExpr *expr = memory_create_literal_expr(literal, literal_token->literal_size, literal_token);
 
         return memory_create_expr(expr, STR_EXPR_TYPE);
     }
 
     if (parser_match(parser, 1, IDENTIFIER_TOKTYPE))
     {
-        Token *token = memory_clone_token(parser_previous(parser));
-
-        IdentifierExpr *expr = memory_create_identifier_expr(token);
+        Token *identifier_token = memory_clone_token(parser_previous(parser));
+        IdentifierExpr *expr = memory_create_identifier_expr(identifier_token);
 
         return memory_create_expr(expr, IDENTIFIER_EXPR_TYPE);
     }

@@ -56,12 +56,12 @@ AssignExpr *memory_create_assign_expr(Expr *left, Token *equals_token, Expr *rig
 void memory_destroy_assign_expr(AssignExpr *expr);
 
 IsExpr *memory_create_is_expr(Expr *left, Token *is_token, Token *type_token);
-void memory_destroy_is_expr(IsExpr * expr);
+void memory_destroy_is_expr(IsExpr *expr);
 
 FromExpr *memory_create_from_expr(Expr *left, Token *from_token, Token *klass_identifier_token);
 void memory_destroy_from_expr(FromExpr *expr);
 
-ArrExpr *memory_create_arr_expr(Expr *len_expr, DynArrPtr *items);
+ArrExpr *memory_create_arr_expr(Token *left_square_token, DynArrPtr *items, Expr *len_expr);
 void memory_destroy_arr_expr(ArrExpr *expr);
 
 LogicalExpr *memory_create_logical_expr(Expr *left, Token *operator, Expr * right);
@@ -76,13 +76,13 @@ void memory_destroy_binary_expr(BinaryExpr *expr);
 UnaryExpr *memory_create_unary_expr(Token *operator, Expr * right);
 void memory_destroy_unary_expr(UnaryExpr *expr);
 
-ArrAccessExpr *memory_create_arr_access_expr(Expr *expr, Expr *index_expr);
+ArrAccessExpr *memory_create_arr_access_expr(Expr *expr, Token *left_square_token, Expr *index_expr);
 void memory_destroy_arr_access_expr(ArrAccessExpr *expr);
 
-AccessExpr *memory_create_access_expr(Expr *left, Token *identifier);
+AccessExpr *memory_create_access_expr(Expr *left, Token *dot_token, Token *identifier);
 void memory_destroy_access_expr(AccessExpr *expr);
 
-CallExpr *memory_create_call_expr(Expr *left, DynArrPtr *args);
+CallExpr *memory_create_call_expr(Expr *left, Token *left_parenthesis_token, DynArrPtr *args);
 void memory_destroy_call_expr(CallExpr *expr);
 
 ThisExpr *memory_create_this_expr(Token *thisToken, Token *IdentifierExpr);
@@ -94,7 +94,7 @@ void memory_destroy_identifier_expr(IdentifierExpr *expr);
 GroupExpr *memory_create_group_expr(Token *left_paren_token, Expr *e);
 void memory_destroy_group_expr(GroupExpr *expr);
 
-LiteralExpr *memory_create_literal_expr(void *literal, size_t literal_size);
+LiteralExpr *memory_create_literal_expr(void *literal, size_t literal_size, Token *literal_token);
 void memory_destroy_literal_expr(LiteralExpr *expr);
 
 Expr *memory_create_expr(void *e, ExprType type);
@@ -148,7 +148,7 @@ void memory_destroy_scanner(Scanner *scanner);
 Parser *memory_create_parser(DynArr *tokens, DynArrPtr *stmts);
 void memory_destroy_parser(Parser *parser);
 
-Symbol *memory_create_symbol(int global, int index, int depth, char *identifier, int is_fn, int class_bound);
+Symbol *memory_create_symbol(int global, int local, int depth, char *identifier, int is_entity, int class_bound);
 void memory_destroy_symbol(Symbol *symbol);
 
 Compiler *memory_create_compiler();
