@@ -6,7 +6,7 @@
 #include "error_report.h"
 
 // private interface
-void parser_error(char *msg, ...);
+void parser_error_at(Token *token, char *msg, ...);
 
 int parser_is_at_end(Parser *parser);
 
@@ -50,12 +50,12 @@ Stmt *parser_return_stmt(Parser *parser);
 Stmt *parser_expr_stmt(Parser *parser);
 
 // private implementation
-void parser_error(char *msg, ...)
+void parser_error_at(Token *token, char *msg, ...)
 {
     va_list args;
     va_start(args, msg);
 
-    report_error(17, "Parser", msg, args);
+    report_error_at(17, token->line, "Parser", msg, args);
 
     va_end(args);
 }
@@ -188,15 +188,14 @@ Expr *parser_is_expr(Expr *left, Token *is_token, Parser *parser)
         Token *type_token = memory_clone_token(parser_previous(parser));
 
         IsExpr *expr = memory_create_is_expr(
-            left, 
-            memory_clone_token(is_token), 
-            type_token
-        );
+            left,
+            memory_clone_token(is_token),
+            type_token);
 
         return memory_create_expr(expr, IS_EXPR_TYPE);
     }
 
-    parser_error("Expect 'nil', 'bool', 'int', 'str', 'klass' or 'instance', but got something else.");
+    parser_error_at(parser_peek(parser), "Expect 'nil', 'bool', 'int', 'str', 'klass' or 'instance', but got something else.");
 
     return NULL;
 }
@@ -204,16 +203,14 @@ Expr *parser_is_expr(Expr *left, Token *is_token, Parser *parser)
 Expr *parser_from_expr(Expr *left, Token *from_token, Parser *parser)
 {
     Token *klass_name_token = parser_consume(
-        parser, 
-        IDENTIFIER_TOKTYPE, 
-        "Expect klass identifier at right side of from expression."
-    );
+        parser,
+        IDENTIFIER_TOKTYPE,
+        "Expect klass identifier at right side of from expression.");
 
     FromExpr *expr = memory_create_from_expr(
-        left, 
-        memory_clone_token(from_token), 
-        memory_clone_token(klass_name_token)
-    );
+        left,
+        memory_clone_token(from_token),
+        memory_clone_token(klass_name_token));
 
     return memory_create_expr(expr, FROM_EXPR_TYPE);
 }
@@ -226,7 +223,7 @@ Expr *parser_type_expr(Parser *parser)
     {
         Token *previous_token = parser_previous(parser);
 
-        if(previous_token->type == IS_TOKTYPE)
+        if (previous_token->type == IS_TOKTYPE)
             return parser_is_expr(left, previous_token, parser);
         else
             return parser_from_expr(left, previous_token, parser);
@@ -524,7 +521,7 @@ Expr *parser_literal_expr(Parser *parser)
 
     Token *token = parser_peek(parser);
 
-    parser_error("Expected something, but got '%s'", token->lexeme);
+    parser_error_at(parser_peek(parser), "Expected something, but got '%s'", token->lexeme);
 
     return NULL;
 }
@@ -753,7 +750,7 @@ Stmt *parser_class_stmt(Parser *parser)
             if (previous_token->type == INIT_TOKTYPE)
             {
                 if (constructor)
-                    parser_error("Classes can't have more than one constructor.");
+                    parser_error_at(raw_identifier, "Classes can't have more than one constructor.");
 
                 constructor = class_constructor(parser, previous_token);
 

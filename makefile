@@ -8,6 +8,7 @@ piko: dynarr.o lzstack.o lzhtable.o lzarea.o lzallocator.o vm_memory.o vm.o dump
 	-L ./bin \
 	-o ./bin/piko \
 	./src/piko.c \
+	-g2 \
 	./bin/dynarr.o ./bin/lzstack.o ./bin/lzhtable.o ./bin/lzarea.o ./bin/lzallocator.o \
 	./bin/vm_memory.o ./bin/vm.o ./bin/dumpper.o ./bin/error_report.o \
 	./bin/memory.o ./bin/scanner.o ./bin/parser.o ./bin/compiler.o
@@ -21,7 +22,8 @@ compiler.o:
 	-I ./include \
 	-I ./include/compiler \
 	-c -o ./bin/compiler.o \
-	./src/compiler/compiler.c
+	./src/compiler/compiler.c \
+	-g2
 
 parser.o:
 	gcc \
@@ -32,7 +34,8 @@ parser.o:
 	-I ./include \
 	-I ./include/compiler \
 	-c -o ./bin/parser.o \
-	./src/compiler/parser.c
+	./src/compiler/parser.c \
+	-g2
 	
 scanner.o:
 	gcc \
@@ -43,7 +46,8 @@ scanner.o:
 	-I ./include \
 	-I ./include/compiler \
 	-c -o ./bin/scanner.o \
-	./src/compiler/scanner.c
+	./src/compiler/scanner.c \
+	-g2
 
 memory.o:
 	gcc \
@@ -54,7 +58,8 @@ memory.o:
 	-c -o ./bin/memory.o \
 	-I ./include \
 	-I ./include/compiler \
-	./src/compiler/memory.c
+	./src/compiler/memory.c \
+	-g2
 
 error_report.o:
 	gcc \
@@ -65,7 +70,8 @@ error_report.o:
 	-I ./include \
 	-I ./include/compiler \
 	-c -o ./bin/error_report.o \
-	./src/compiler/error_report.c
+	./src/compiler/error_report.c \
+	-g2
 	
 dumpper.o: vm.o
 	gcc \
@@ -77,7 +83,8 @@ dumpper.o: vm.o
 	-I ./include \
 	-I ./include/vm \
 	-c -o ./bin/dumpper.o \
-	./src/vm/dumpper.c
+	./src/vm/dumpper.c \
+	-g2
 
 vm.o: vm_memory.o
 	gcc \
@@ -89,7 +96,8 @@ vm.o: vm_memory.o
 	-I ./include \
 	-I ./include/vm \
 	-c -o ./bin/vm.o \
-	./src/vm/vm.c
+	./src/vm/vm.c \
+	-g2
 
 vm_memory.o:
 	gcc \
@@ -101,7 +109,8 @@ vm_memory.o:
 	-I ./include \
 	-I ./include/vm \
 	-c -o ./bin/vm_memory.o \
-	./src/vm/vm_memory.c
+	./src/vm/vm_memory.c \
+	-g2
 	
 lzallocator.o:
 	gcc \
@@ -110,7 +119,8 @@ lzallocator.o:
 	-Werror \
 	-I ./include/essentials \
 	-c -o ./bin/lzallocator.o \
-	./src/essentials/lzallocator.c
+	./src/essentials/lzallocator.c \
+	-g2
 
 lzarea.o:
 	gcc \
@@ -120,7 +130,8 @@ lzarea.o:
 	-Wno-unused-function \
 	-I ./include/essentials \
 	-c -o ./bin/lzarea.o \
-	./src/essentials/lzarea.c
+	./src/essentials/lzarea.c \
+	-g2
 
 
 lzhtable.o:
@@ -131,7 +142,8 @@ lzhtable.o:
 	-Wno-unused-function \
 	-I ./include/essentials \
 	-c -o ./bin/lzhtable.o \
-	./src/essentials/lzhtable.c
+	./src/essentials/lzhtable.c \
+	-g2
 
 	
 lzstack.o:
@@ -141,7 +153,8 @@ lzstack.o:
 	-Werror \
 	-I ./include/essentials \
 	-c -o ./bin/lzstack.o \
-	./src/essentials/lzstack.c
+	./src/essentials/lzstack.c \
+	-g2
 	
 dynarr.o:
 	gcc \
@@ -150,5 +163,5 @@ dynarr.o:
 	-Werror \
 	-I ./include/essentials \
 	-c -o ./bin/dynarr.o \
-	./src/essentials/dynarr.c
-
+	./src/essentials/dynarr.c \
+	-g2

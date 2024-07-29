@@ -7,7 +7,7 @@
 #include <stdint.h>
 #include <assert.h>
 
-void scanner_error(char *msg, ...);
+void scanner_error_at(Scanner *scanner, char *msg, ...);
 void scanner_add_keyword(char *keyword, TokenType type, LZHTable *table);
 void scanner_clear_keywords(LZHTable *table);
 
@@ -33,12 +33,12 @@ void scanner_identifier(Scanner *scanner);
 void scanner_scan_token(Scanner *scanner);
 
 // private implementation
-void scanner_error(char *msg, ...)
+void scanner_error_at(Scanner *scanner, char *msg, ...)
 {
     va_list args;
     va_start(args, msg);
 
-    report_error(11, "Scanner", msg, args);
+    report_error_at(11, scanner->line, "Scanner", msg, args);
 
     va_end(args);
 }
@@ -192,7 +192,7 @@ void scanner_string(Scanner *scanner)
             line++;
 
     if (scanner_peek(scanner) != '"')
-        scanner_error("Unterminated string. Expect '\"' at end of string");
+        scanner_error_at(scanner, "Unterminated string. Expect '\"' at end of string");
 
     scanner_advance(scanner);
 
@@ -342,7 +342,7 @@ void scanner_scan_token(Scanner *scanner)
         else if (scanner_is_alpha_numeric(c))
             scanner_identifier(scanner);
         else
-            scanner_error("Unknown token '%c'", c);
+            scanner_error_at(scanner, "Unknown token '%c'", c);
 
         break;
     }
