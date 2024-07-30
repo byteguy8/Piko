@@ -24,6 +24,10 @@ Expr *parser_expr(Parser *parser);
 Expr *parser_assign_expr(Parser *parser);
 Expr *parser_type_expr(Parser *parser);
 Expr *parser_arr_expr(Parser *parser);
+Expr *parser_bit_or(Parser *parser);
+Expr *parser_bit_xor(Parser *parser);
+Expr *parser_bit_and(Parser *parser);
+Expr *parser_bit_not(Parser *parser);
 Expr *parser_or_expr(Parser *parser);
 Expr *parser_and_expr(Parser *parser);
 Expr *parser_comparison_expr(Parser *parser);
@@ -258,6 +262,72 @@ Expr *parser_arr_expr(Parser *parser)
         return memory_create_expr(expr, ARR_EXPR_TYPE);
     }
 
+    return parser_bit_or(parser);
+}
+
+Expr *parser_bit_or(Parser *parser)
+{
+    Expr *left = parser_bit_xor(parser);
+
+    while (parser_match(parser, 1, BITWISE_OR_TOKTYPE))
+    {
+        Token *operator_token = memory_clone_token(parser_previous(parser));
+        Expr *right = parser_bit_xor(parser);
+
+        BinaryExpr *expr = memory_create_binary_expr(left, operator_token, right);
+
+        left = memory_create_expr(expr, BINARY_EXPR_TYPE);
+    }
+
+    return left;
+}
+
+Expr *parser_bit_xor(Parser *parser)
+{
+    Expr *left = parser_bit_and(parser);
+
+    while (parser_match(parser, 1, BITWISE_XOR_TOKTYPE))
+    {
+        Token *operator_token = memory_clone_token(parser_previous(parser));
+        Expr *right = parser_bit_and(parser);
+
+        BinaryExpr *expr = memory_create_binary_expr(left, operator_token, right);
+
+        left = memory_create_expr(expr, BINARY_EXPR_TYPE);
+    }
+
+    return left;
+}
+
+Expr *parser_bit_and(Parser *parser)
+{
+    Expr *left = parser_bit_not(parser);
+
+    while (parser_match(parser, 1, BITWISE_AND_TOKTYPE))
+    {
+        Token *operator_token = memory_clone_token(parser_previous(parser));
+        Expr *right = parser_bit_not(parser);
+
+        BinaryExpr *expr = memory_create_binary_expr(left, operator_token, right);
+
+        left = memory_create_expr(expr, BINARY_EXPR_TYPE);
+    }
+
+    return left;
+}
+
+Expr *parser_bit_not(Parser *parser)
+{
+    if (parser_match(parser, 1, BITWISE_NOT_TOKTYPE))
+    {
+        Token *operator_token = memory_clone_token(parser_previous(parser));
+        Expr *right = parser_bit_not(parser);
+
+        UnaryExpr *expr = memory_create_unary_expr(operator_token, right);
+
+        return memory_create_expr(expr, UNARY_EXPR_TYPE);
+    }
+
     return parser_or_expr(parser);
 }
 
@@ -284,10 +354,10 @@ Expr *parser_and_expr(Parser *parser)
 
     while (parser_match(parser, 1, AND_TOKTYPE))
     {
-        Token *operator= memory_clone_token(parser_previous(parser));
+        Token *operator_token = memory_clone_token(parser_previous(parser));
         Expr *right = parser_comparison_expr(parser);
 
-        LogicalExpr *expr = memory_create_logical_expr(left, operator, right);
+        LogicalExpr *expr = memory_create_logical_expr(left, operator_token, right);
 
         left = memory_create_expr(expr, LOGICAL_EXPR_TYPE);
     }
@@ -307,10 +377,10 @@ Expr *parser_comparison_expr(Parser *parser)
                         EQUALS_EQUALS_TOKTYPE,
                         NOT_EQUALS_TOKTYPE))
     {
-        Token *operator= memory_clone_token(parser_previous(parser));
+        Token *operator_token = memory_clone_token(parser_previous(parser));
         Expr *right = parser_term_expr(parser);
 
-        ComparisonExpr *expr = memory_create_comparison_expr(left, operator, right);
+        ComparisonExpr *expr = memory_create_comparison_expr(left, operator_token, right);
 
         left = memory_create_expr(expr, COMPARISON_EXPR_TYPE);
     }
@@ -324,10 +394,10 @@ Expr *parser_term_expr(Parser *parser)
 
     while (parser_match(parser, 2, PLUS_TOKTYPE, MINUS_TOKTYPE))
     {
-        Token *operator= memory_clone_token(parser_previous(parser));
+        Token *operator_token = memory_clone_token(parser_previous(parser));
         Expr *right = parser_factor_expr(parser);
 
-        BinaryExpr *expr = memory_create_binary_expr(left, operator, right);
+        BinaryExpr *expr = memory_create_binary_expr(left, operator_token, right);
 
         left = memory_create_expr(expr, BINARY_EXPR_TYPE);
     }
@@ -341,10 +411,10 @@ Expr *parser_factor_expr(Parser *parser)
 
     while (parser_match(parser, 3, ASTERISK_TOKTYPE, SLASH_TOKTYPE, PERCENT_TOKTYPE))
     {
-        Token *operator= memory_clone_token(parser_previous(parser));
+        Token *operator_token = memory_clone_token(parser_previous(parser));
         Expr *right = parser_unary_expr(parser);
 
-        BinaryExpr *expr = memory_create_binary_expr(left, operator, right);
+        BinaryExpr *expr = memory_create_binary_expr(left, operator_token, right);
 
         left = memory_create_expr(expr, BINARY_EXPR_TYPE);
     }
@@ -356,10 +426,10 @@ Expr *parser_unary_expr(Parser *parser)
 {
     if (parser_match(parser, 2, MINUS_TOKTYPE, EXCLAMATION_TOKTYPE))
     {
-        Token *operator= memory_clone_token(parser_previous(parser));
+        Token *operator_token = memory_clone_token(parser_previous(parser));
         Expr *right = parser_unary_expr(parser);
 
-        UnaryExpr *expr = memory_create_unary_expr(operator, right);
+        UnaryExpr *expr = memory_create_unary_expr(operator_token, right);
 
         return memory_create_expr(expr, UNARY_EXPR_TYPE);
     }

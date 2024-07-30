@@ -378,7 +378,7 @@ void compiler_arr_expr(ArrExpr *expr)
         vm_write_i64_const((int64_t)exprs->used, COMPILER_VM);
     }
 
-    vm_write_chunk(OARR_OPC, COMPILER_VM);
+    vm_write_chunk(ARR_OPC, COMPILER_VM);
     vm_write_chunk(exprs->used == 0, COMPILER_VM);
 }
 
@@ -471,6 +471,18 @@ void compiler_binary_expr(BinaryExpr *expr)
         vm_write_chunk(MOD_OPC, COMPILER_VM);
         break;
 
+    case BITWISE_OR_TOKTYPE:
+        vm_write_chunk(BOR_OPC, COMPILER_VM);
+        break;
+
+    case BITWISE_XOR_TOKTYPE:
+        vm_write_chunk(BXOR_OPC, COMPILER_VM);
+        break;
+
+    case BITWISE_AND_TOKTYPE:
+        vm_write_chunk(BAND_OPC, COMPILER_VM);
+        break;
+
     default:
         assert(0 && "Illegal binary operator type value");
     }
@@ -490,6 +502,10 @@ void compiler_unary_expr(UnaryExpr *expr)
 
     case MINUS_TOKTYPE:
         vm_write_chunk(NNOT_OPC, COMPILER_VM);
+        break;
+
+    case BITWISE_NOT_TOKTYPE:
+        vm_write_chunk(BNOT_OPC, COMPILER_VM);
         break;
 
     default:

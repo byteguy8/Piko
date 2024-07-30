@@ -236,6 +236,14 @@ void scanner_scan_token(Scanner *scanner)
         scanner_add_token(MINUS_TOKTYPE, scanner);
         break;
 
+    case '^':
+        scanner_add_token(BITWISE_XOR_TOKTYPE, scanner);
+        break;
+
+    case '~':
+        scanner_add_token(BITWISE_NOT_TOKTYPE, scanner);
+        break;
+
     case '*':
         scanner_add_token(ASTERISK_TOKTYPE, scanner);
         break;
@@ -291,11 +299,15 @@ void scanner_scan_token(Scanner *scanner)
     case '|':
         if (scanner_match('|', scanner))
             scanner_add_token(OR_TOKTYPE, scanner);
+        else
+            scanner_add_token(BITWISE_OR_TOKTYPE, scanner);
         break;
 
     case '&':
         if (scanner_match('&', scanner))
             scanner_add_token(AND_TOKTYPE, scanner);
+        else
+            scanner_add_token(BITWISE_AND_TOKTYPE, scanner);
         break;
 
     case '<':

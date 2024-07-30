@@ -3,12 +3,12 @@
 
 typedef enum _opcode_
 {
-    NIL_OPC,
-    BCONST_OPC,
-    ICONST_OPC,
-    SCONST_OPC,
-    OARR_OPC, // creates an object array
+    NIL_OPC,    // push nil to stack
+    BCONST_OPC, // push an bool value to stack
+    ICONST_OPC, // push an int value to stack
+    SCONST_OPC, // push a str value to stack
 
+    ARR_OPC,      // creates an array
     ARR_LEN_OPC,  // gets the length of an array
     ARR_ITM_OPC,  // gets a item from a array
     ARR_SITM_OPC, // sets a value to a array item
@@ -19,7 +19,7 @@ typedef enum _opcode_
     GWRITE_OPC, // creates a global variable
     GREAD_OPC,  // gets a global variable
 
-    LOAD_OPC,
+    LOAD_OPC, // load an entity
 
     // arithmetic
     ADD_OPC,
@@ -36,16 +36,22 @@ typedef enum _opcode_
     EQ_OPC, // equals
     NE_OPC, // not equals
 
-    // control flow
-    JMP_OPC, // unconditional jump
-    JIT_OPC, // jump if true
-    JIF_OPC, // jump if false
-
     // logical
     OR_OPC,
     AND_OPC,
     NOT_OPC,
     NNOT_OPC,
+
+    // bitwise
+    BOR_OPC,
+    BXOR_OPC,
+    BAND_OPC,
+    BNOT_OPC,
+
+    // control flow
+    JMP_OPC, // unconditional jump
+    JIT_OPC, // jump if true
+    JIF_OPC, // jump if false
 
     CONCAT_OPC,  // join two strings
     STR_LEN_OPC, // length of a string

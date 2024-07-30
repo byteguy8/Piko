@@ -189,6 +189,7 @@ void vm_execute_comparison(int type, VM *vm);
 void vm_execute_argjmp(int type, VM *vm);
 void vm_execute_logical(int type, VM *vm);
 void vm_execute_negation(int type, VM *vm);
+void vm_execute_bitwise(int type, VM *vm);
 void vm_execute_concat(VM *vm);
 void vm_execute_length_str(VM *vm);
 void vm_execute_str_itm(VM *vm);
@@ -2099,6 +2100,63 @@ void vm_execute_negation(int type, VM *vm)
     }
 }
 
+void vm_execute_bitwise(int type, VM *vm)
+{
+    if (type >= 1 && type <= 3)
+    {
+        Holder *right_holder = vm_stack_pop(vm);
+        Holder *left_holder = vm_stack_pop(vm);
+
+        Value *left_value = NULL;
+        Value *right_value = NULL;
+
+        if (!vm_is_holder_int(left_holder, &left_value))
+            vm_err("Failed to execute bitwise. Expect int at left side, but got something else.");
+
+        if (!vm_is_holder_int(right_holder, &right_value))
+            vm_err("Failed to execute bitwise. Expect int at right side, but got something else.");
+
+        int64_t left = left_value->i64;
+        int64_t right = right_value->i64;
+
+        switch (type)
+        {
+        case 1: // or
+            vm_stack_push_int(left | right, vm);
+            break;
+
+        case 2: // xor
+            vm_stack_push_int(left ^ right, vm);
+            break;
+
+        case 3: // and
+            vm_stack_push_int(left & right, vm);
+            break;
+
+        case 4: // not
+            vm_stack_push_int(left | right, vm);
+            break;
+
+        default:
+            assert(0 && "Illegal bitwise operation type");
+        }
+    }
+    else if (type == 4)
+    {
+        Holder *right_holder = vm_stack_pop(vm);
+        Value *right_value = NULL;
+
+        if (!vm_is_holder_int(right_holder, &right_value))
+            vm_err("Failed to execute bitwise. Expect int at right side, but got something else.");
+
+        int64_t right = right_value->i64;
+
+        vm_stack_push_int(~right, vm);
+    }
+    else
+        assert(0 && "Illegal bitwise operation type");
+}
+
 void vm_execute_concat(VM *vm)
 {
     Holder *right = vm_stack_pop(vm);
@@ -2161,7 +2219,7 @@ void vm_execute_str_itm(VM *vm)
         vm_err("Failed to get str character. Constraints: 0 < index (%d) < str_len (%ld).", index, str->length);
 
     char *clone_char = vm_memory_alloc(2);
-    
+
     clone_char[0] = str->buffer[index];
     clone_char[1] = 0;
 
@@ -2575,7 +2633,7 @@ void vm_execute_instruction(VM *vm)
         vm_execute_string(vm);
         break;
 
-    case OARR_OPC:
+    case ARR_OPC:
         vm_validate_opcode("OARR", 1, vm);
         vm_execute_object_array(vm);
         break;
@@ -2620,7 +2678,7 @@ void vm_execute_instruction(VM *vm)
         vm_execute_load_entity(vm);
         break;
 
-        // arithmetic
+    // arithmetic
     case ADD_OPC:
         // do not require to validate op
         vm_execute_arithmetic(1, vm);
@@ -2646,7 +2704,7 @@ void vm_execute_instruction(VM *vm)
         vm_execute_arithmetic(5, vm);
         break;
 
-        // comparison
+    // comparison
     case LT_OPC:
         // do not require to validate op
         vm_execute_comparison(1, vm);
@@ -2677,18 +2735,7 @@ void vm_execute_instruction(VM *vm)
         vm_execute_comparison(6, vm);
         break;
 
-    // conditional jump with arg
-    case JIT_OPC:
-        vm_validate_opcode("JIT", 4, vm);
-        vm_execute_argjmp(1, vm);
-        break;
-
-    case JIF_OPC:
-        vm_validate_opcode("JIF", 4, vm);
-        vm_execute_argjmp(2, vm);
-        break;
-
-        // logical
+    // logical
     case OR_OPC:
         // do not require to validate op
         vm_execute_logical(1, vm);
@@ -2707,6 +2754,43 @@ void vm_execute_instruction(VM *vm)
     case NNOT_OPC:
         // do not require to validate op
         vm_execute_negation(2, vm);
+        break;
+
+    // bitwise
+    case BOR_OPC:
+        // do not require to validate op
+        vm_execute_bitwise(1, vm);
+        break;
+
+    case BXOR_OPC:
+        // do not require to validate op
+        vm_execute_bitwise(2, vm);
+        break;
+
+    case BAND_OPC:
+        // do not require to validate op
+        vm_execute_bitwise(3, vm);
+        break;
+
+    case BNOT_OPC:
+        // do not require to validate op
+        vm_execute_bitwise(4, vm);
+        break;
+
+    // control flow
+    case JMP_OPC:
+        vm_validate_opcode("JMPC", 4, vm);
+        vm_execute_jmp(vm);
+        break;
+
+    case JIT_OPC:
+        vm_validate_opcode("JIT", 4, vm);
+        vm_execute_argjmp(1, vm);
+        break;
+
+    case JIF_OPC:
+        vm_validate_opcode("JIF", 4, vm);
+        vm_execute_argjmp(2, vm);
         break;
 
     case CONCAT_OPC:
@@ -2752,11 +2836,6 @@ void vm_execute_instruction(VM *vm)
     case THIS_OPC:
         // do not require to validate op
         vm_execute_this(vm);
-        break;
-
-    case JMP_OPC:
-        vm_validate_opcode("JMPC", 4, vm);
-        vm_execute_jmp(vm);
         break;
 
     case PRT_OPC:

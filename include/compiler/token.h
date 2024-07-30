@@ -22,6 +22,11 @@ typedef enum _token_type_
     AND_TOKTYPE,
     NOT_TOKTYPE,
 
+    BITWISE_OR_TOKTYPE,
+    BITWISE_XOR_TOKTYPE,
+    BITWISE_AND_TOKTYPE,
+    BITWISE_NOT_TOKTYPE,
+
     LEFT_PARENTHESIS_TOKTYPE,
     RIGHT_PARENTHESIS_TOKTYPE,
     LEFT_SQUARE_TOKTYPE,
@@ -54,7 +59,7 @@ typedef enum _token_type_
     PRINT_TOKTYPE,
     PROC_TOKTYPE,
     RETURN_TOKTYPE,
-    
+
     IS_TOKTYPE,
     FROM_TOKTYPE,
     BOOL_TOKTYPE,
@@ -62,7 +67,7 @@ typedef enum _token_type_
     STR_TOKTYPE,
     ARR_TOKTYPE,
     INSTANCE_TOKTYPE,
-    
+
     CLASS_TOKTYPE,
     INIT_TOKTYPE,
     THIS_TOKTYPE,
