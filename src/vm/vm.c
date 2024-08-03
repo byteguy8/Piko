@@ -189,6 +189,7 @@ void vm_execute_comparison(int type, VM *vm);
 void vm_execute_argjmp(int type, VM *vm);
 void vm_execute_logical(int type, VM *vm);
 void vm_execute_negation(int type, VM *vm);
+void vm_execute_shift(int type, VM *vm);
 void vm_execute_bitwise(int type, VM *vm);
 void vm_execute_concat(VM *vm);
 void vm_execute_length_str(VM *vm);
@@ -2100,6 +2101,38 @@ void vm_execute_negation(int type, VM *vm)
     }
 }
 
+void vm_execute_shift(int type, VM *vm)
+{
+    Holder *right_holder = vm_stack_pop(vm);
+    Holder *left_holder = vm_stack_pop(vm);
+
+    Value *left_value = NULL;
+    Value *right_value = NULL;
+
+    if (!vm_is_holder_int(left_holder, &left_value))
+        vm_err("Failed to execute shift. Expect int at left side, but got something else.");
+
+    if (!vm_is_holder_int(right_holder, &right_value))
+        vm_err("Failed to execute shift. Expect int at right side, but got something else.");
+
+    int64_t left = left_value->i64;
+    int64_t right = right_value->i64;
+
+    switch (type)
+    {
+    case 1: // left shift
+        vm_stack_push_int(left << right, vm);
+        break;
+
+    case 2: // right shift
+        vm_stack_push_int(left >> right, vm);
+        break;
+
+    default:
+        assert(0 && "Illegal shift operation type");
+    }
+}
+
 void vm_execute_bitwise(int type, VM *vm)
 {
     if (type >= 1 && type <= 3)
@@ -2754,6 +2787,15 @@ void vm_execute_instruction(VM *vm)
     case NNOT_OPC:
         // do not require to validate op
         vm_execute_negation(2, vm);
+        break;
+
+    // shift
+    case SLEFT_OPC:
+        vm_execute_shift(1, vm);
+        break;
+
+    case SRIGHT_OPC:
+        vm_execute_shift(2, vm);
         break;
 
     // bitwise

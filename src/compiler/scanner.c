@@ -311,14 +311,18 @@ void scanner_scan_token(Scanner *scanner)
         break;
 
     case '<':
-        if (scanner_match('=', scanner))
+        if (scanner_match('<', scanner))
+            scanner_add_token(SHIFT_LEFT, scanner);
+        else if (scanner_match('=', scanner))
             scanner_add_token(LESS_EQUALS_TOKTYPE, scanner);
         else
             scanner_add_token(LESS_TOKTYPE, scanner);
         break;
 
     case '>':
-        if (scanner_match('=', scanner))
+        if (scanner_match('>', scanner))
+            scanner_add_token(SHIFT_RIGHT, scanner);
+        else if (scanner_match('=', scanner))
             scanner_add_token(GREATER_EQUALS_TOKTYPE, scanner);
         else
             scanner_add_token(GREATER_TOKTYPE, scanner);

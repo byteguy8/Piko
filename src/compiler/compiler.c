@@ -471,6 +471,14 @@ void compiler_binary_expr(BinaryExpr *expr)
         vm_write_chunk(MOD_OPC, COMPILER_VM);
         break;
 
+    case SHIFT_LEFT:
+        vm_write_chunk(SLEFT_OPC, COMPILER_VM);
+        break;
+
+    case SHIFT_RIGHT:
+        vm_write_chunk(SRIGHT_OPC, COMPILER_VM);
+        break;
+
     case BITWISE_OR_TOKTYPE:
         vm_write_chunk(BOR_OPC, COMPILER_VM);
         break;

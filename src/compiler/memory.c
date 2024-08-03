@@ -271,7 +271,13 @@ void memory_destroy_token(Token *token)
 
 Token *memory_clone_token(Token *token)
 {
-    void *literal = token->literal ? memory_alloc(sizeof(token->literal_size)) : NULL;
+    void *literal = NULL;
+
+    if (token->type == STRING_TOKTYPE)
+        literal = token->literal ? memory_clone_raw_str((char *)token->literal) : NULL;
+    else
+        literal = token->literal ? memory_alloc(token->literal_size) : NULL;
+
     Token *new_token = (Token *)memory_alloc(sizeof(Token));
 
     if (literal)

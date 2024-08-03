@@ -42,6 +42,10 @@ typedef enum _opcode_
     NOT_OPC,
     NNOT_OPC,
 
+    // shift
+    SLEFT_OPC,
+    SRIGHT_OPC,
+
     // bitwise
     BOR_OPC,
     BXOR_OPC,

@@ -338,6 +338,21 @@ void dumpper_execute_raw_instruction(uint8_t instruction)
         break;
     }
 
+    // shift
+    case SLEFT_OPC:
+    {
+        printf("SLEFT\n");
+
+        break;
+    }
+
+    case SRIGHT_OPC:
+    {
+        printf("SRIGHT\n");
+
+        break;
+    }
+
     // bitwise
     case BOR_OPC:
     {

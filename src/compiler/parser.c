@@ -31,6 +31,7 @@ Expr *parser_bit_not(Parser *parser);
 Expr *parser_or_expr(Parser *parser);
 Expr *parser_and_expr(Parser *parser);
 Expr *parser_comparison_expr(Parser *parser);
+Expr *parser_shift_expr(Parser *parser);
 Expr *parser_term_expr(Parser *parser);
 Expr *parser_factor_expr(Parser *parser);
 Expr *parser_unary_expr(Parser *parser);
@@ -367,7 +368,7 @@ Expr *parser_and_expr(Parser *parser)
 
 Expr *parser_comparison_expr(Parser *parser)
 {
-    Expr *left = parser_term_expr(parser);
+    Expr *left = parser_shift_expr(parser);
 
     while (parser_match(parser, 6,
                         LESS_TOKTYPE,
@@ -378,11 +379,28 @@ Expr *parser_comparison_expr(Parser *parser)
                         NOT_EQUALS_TOKTYPE))
     {
         Token *operator_token = memory_clone_token(parser_previous(parser));
-        Expr *right = parser_term_expr(parser);
+        Expr *right = parser_shift_expr(parser);
 
         ComparisonExpr *expr = memory_create_comparison_expr(left, operator_token, right);
 
         left = memory_create_expr(expr, COMPARISON_EXPR_TYPE);
+    }
+
+    return left;
+}
+
+Expr *parser_shift_expr(Parser *parser)
+{
+    Expr *left = parser_term_expr(parser);
+
+    while (parser_match(parser, 2, SHIFT_LEFT, SHIFT_RIGHT))
+    {
+        Token *operator_token = memory_clone_token(parser_previous(parser));
+        Expr *right = parser_term_expr(parser);
+
+        BinaryExpr *expr = memory_create_binary_expr(left, operator_token, right);
+
+        left = memory_create_expr(expr, BINARY_EXPR_TYPE);
     }
 
     return left;
@@ -567,7 +585,8 @@ Expr *parser_literal_expr(Parser *parser)
 
     if (parser_match(parser, 1, STRING_TOKTYPE))
     {
-        Token *literal_token = memory_clone_token(parser_previous(parser));
+        Token *raw_literal_token = parser_previous(parser);
+        Token *literal_token = memory_clone_token(raw_literal_token);
         char *literal = memory_clone_raw_str((char *)literal_token->literal);
 
         LiteralExpr *expr = memory_create_literal_expr(literal, literal_token->literal_size, literal_token);

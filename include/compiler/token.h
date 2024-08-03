@@ -22,6 +22,8 @@ typedef enum _token_type_
     AND_TOKTYPE,
     NOT_TOKTYPE,
 
+    SHIFT_LEFT,
+    SHIFT_RIGHT,
     BITWISE_OR_TOKTYPE,
     BITWISE_XOR_TOKTYPE,
     BITWISE_AND_TOKTYPE,
