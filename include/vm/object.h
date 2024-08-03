@@ -5,8 +5,8 @@
 #include "function.h"
 #include "klass.h"
 
-#include "essentials/dynarr.h"
-#include "essentials/lzhtable.h"
+#include <essentials/dynarr.h>
+#include <essentials/lzhtable.h>
 
 struct _object_;
 

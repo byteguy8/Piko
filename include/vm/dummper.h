@@ -2,7 +2,7 @@
 #define _DUMPPER_H_
 
 #include "vm.h"
-#include "essentials/lzstack.h"
+#include <essentials/lzstack.h>
 
 #define DUMPPER_SCOPE_LENGTH 255
 

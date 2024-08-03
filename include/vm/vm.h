@@ -7,10 +7,10 @@
 #include "function.h"
 #include "klass.h"
 
-#include "essentials/dynarr.h"
-#include "essentials/lzstack.h"
-#include "essentials/lzhtable.h"
-#include "essentials/lzallocator.h"
+#include <essentials/dynarr.h>
+#include <essentials/lzstack.h>
+#include <essentials/lzhtable.h>
+#include <essentials/lzallocator.h>
 
 #include <stdio.h>
 #include <string.h>

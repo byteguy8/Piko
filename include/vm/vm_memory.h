@@ -1,10 +1,10 @@
 #ifndef _VM_MEMORY_H_
 #define _VM_MEMORY_H_
 
-#include "essentials/dynarr.h"
-#include "essentials/lzallocator.h"
-#include "essentials/lzhtable.h"
-#include "essentials/lzstack.h"
+#include <essentials/dynarr.h>
+#include <essentials/lzallocator.h>
+#include <essentials/lzhtable.h>
+#include <essentials/lzstack.h>
 
 #include "function.h"
 #include "klass.h"
