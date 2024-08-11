@@ -18,6 +18,9 @@ static int is_str_int(char *str, size_t str_len)
     {
         char c = str[i];
 
+        if (i == 0 && c == '-')
+            continue;
+
         if (c < '0' || c > '9')
             return 0;
     }
@@ -25,37 +28,23 @@ static int is_str_int(char *str, size_t str_len)
     return 1;
 }
 
-static int64_t str_to_int(char *str, size_t str_len)
-{
-    int64_t value = 0;
-
-    for (size_t i = 0; i < str_len; i++)
-    {
-        char c = str[i];
-        int64_t v = (int64_t)c - 48;
-
-        value *= 10;
-        value += v;
-    }
-
-    return value;
-}
-
 // private interface
 
 //> native functions
 // strings
-static void native_fn_char_code(DynArr *args, VM *vm);
-static void native_fn_code_char(DynArr *args, VM *vm);
-static void native_fn_sub_str(DynArr *args, VM *vm);
+static void native_fn_ascii(DynArr *args, VM *vm);
+static void native_fn_ascii_code(DynArr *args, VM *vm);
+
+static void native_fn_str_sub(DynArr *args, VM *vm);
 static void native_fn_str_lower(DynArr *args, VM *vm);
 static void native_fn_str_upper(DynArr *args, VM *vm);
 static void native_fn_str_title(DynArr *args, VM *vm);
-static void native_fn_cmp_str(DynArr *args, VM *vm);
-static void native_fn_cmp_ic_str(DynArr *args, VM *vm);
+static void native_fn_str_cmp(DynArr *args, VM *vm);
+static void native_fn_str_cmp_ic(DynArr *args, VM *vm);
+
 static void native_fn_is_str_int(DynArr *args, VM *vm);
-static void native_fn_ascii_to_int(DynArr *args, VM *vm);
-static void native_fn_int_to_ascii(DynArr *args, VM *vm);
+static void native_fn_str_to_int(DynArr *args, VM *vm);
+static void native_fn_int_to_str(DynArr *args, VM *vm);
 
 // time related
 static void native_fn_time(DynArr *args, VM *vm);
@@ -223,7 +212,7 @@ Holder *vm_frame_slot(uint8_t index, VM *vm)
 }
 
 // private implementation
-static void native_fn_char_code(DynArr *args, VM *vm)
+static void native_fn_ascii_code(DynArr *args, VM *vm)
 {
     Holder *str_holder = dynarr_get(0, args);
     Holder *index_holder = dynarr_get(1, args);
@@ -247,36 +236,35 @@ static void native_fn_char_code(DynArr *args, VM *vm)
     vm_stack_push_int((int64_t)c, vm);
 }
 
-static void native_fn_code_char(DynArr *args, VM *vm)
+void native_fn_ascii(DynArr *args, VM *vm)
 {
-    Holder *code_holder = dynarr_get(0, args);
+    Holder *num_holder = dynarr_get(0, args);
+    Value *num_value = NULL;
 
-    Value *code_value = NULL;
+    if (!vm_is_holder_int(num_holder, &num_value))
+        vm_err("Failed to execute native function 'int_to_ascii'. Expect int as argument 0.");
 
-    if (!vm_is_holder_int(code_holder, &code_value))
-        vm_err("Failed to execute native function 'code_char'. Expect int as argument 0.");
+    int64_t num = num_value->i64;
 
-    int64_t code = code_value->i64;
+    if (num < 0 || num > 127)
+        vm_err("Failed to execute native function 'int_to_ascii'. Argument 0 constraints: 0 < num <= 127.");
 
-    if (code < 0 || code > 127)
-        vm_err("Failed to execute native function 'code_char'. Argument 0 constraints: 0 <= code (%d) <= 127", code);
+    char *buffer = vm_memory_alloc(2);
 
-    char *buff = (char *)vm_memory_alloc(2);
+    buffer[0] = (char)num;
+    buffer[1] = 0;
 
-    buff[0] = (char)code;
-    buff[1] = 0;
+    Object *new_str_obj = vm_create_object(STR_OTYPE, vm);
+    String *new_str = &new_str_obj->value.string;
 
-    Object *str_obj = vm_create_object(STR_OTYPE, vm);
-    String *str = &str_obj->value.string;
+    new_str->core = 0;
+    new_str->buffer = buffer;
+    new_str->length = 1;
 
-    str->core = 0;
-    str->buffer = buff;
-    str->length = 1;
-
-    vm_stack_push_object(str_obj, vm);
+    vm_stack_push_object(new_str_obj, vm);
 }
 
-void native_fn_sub_str(DynArr *args, VM *vm)
+void native_fn_str_sub(DynArr *args, VM *vm)
 {
     Holder *str_holder = dynarr_get(0, args);
     Holder *from_holder = dynarr_get(1, args);
@@ -446,7 +434,7 @@ void native_fn_str_title(DynArr *args, VM *vm)
     vm_stack_push_object(new_str_obj, vm);
 }
 
-void native_fn_cmp_str(DynArr *args, VM *vm)
+void native_fn_str_cmp(DynArr *args, VM *vm)
 {
     Holder *str0_holder = dynarr_get(0, args);
     Holder *str1_holder = dynarr_get(1, args);
@@ -465,7 +453,7 @@ void native_fn_cmp_str(DynArr *args, VM *vm)
     vm_stack_push_bool(equals, vm);
 }
 
-void native_fn_cmp_ic_str(DynArr *args, VM *vm)
+void native_fn_str_cmp_ic(DynArr *args, VM *vm)
 {
     Holder *str0_holder = dynarr_get(0, args);
     Holder *str1_holder = dynarr_get(1, args);
@@ -523,49 +511,98 @@ void native_fn_is_str_int(DynArr *args, VM *vm)
     vm_stack_push_bool(is_str_int(str->buffer, str->length), vm);
 }
 
-void native_fn_ascii_to_int(DynArr *args, VM *vm)
+void native_fn_str_to_int(DynArr *args, VM *vm)
 {
     Holder *str_holder = dynarr_get(0, args);
 
     if (!vm_is_holder_string(str_holder))
-        vm_err("Failed to execute native function 'str_to_int'. Expect str as argument 0.");
+        vm_err("Failed to execute native function 'str_to_int'. Argument 0 must be str type.");
 
     String *str = &str_holder->entity.object->value.string;
 
-    if (!is_str_int(str->buffer, str->length))
-        vm_err("Failed to parse str to int: str does not contain an int value.");
+    char *buffer = str->buffer;
+    size_t length = str->length;
 
-    int64_t value = str_to_int(str->buffer, str->length);
+    if (!is_str_int(buffer, length))
+        vm_err("Failed to execute native function 'str_to_int'. Argument 0 must represent a decimal number.");
 
-    vm_stack_push_int(value, vm);
+    int64_t number = 0;
+    int is_negative = 0;
+
+    for (size_t i = 0; i < length; i++)
+    {
+        char c = buffer[i];
+
+        if (!is_negative && c == '-')
+        {
+            is_negative = 1;
+            continue;
+        }
+
+        char digit = c - 48;
+
+        number *= 10;
+        number += digit;
+    }
+
+    if (is_negative)
+        number *= -1;
+
+    vm_stack_push_int(number, vm);
 }
 
-void native_fn_int_to_ascii(DynArr *args, VM *vm)
+void native_fn_int_to_str(DynArr *args, VM *vm)
 {
     Holder *num_holder = dynarr_get(0, args);
     Value *num_value = NULL;
 
     if (!vm_is_holder_int(num_holder, &num_value))
-        vm_err("Failed to execute native function 'int_to_ascii'. Expect int as argument 0.");
+        vm_err("Failed to execute native function 'int_to_str'. Expect int as argument 0.");
 
-    int64_t num = num_value->i64;
+    int64_t raw_num = num_value->i64;
 
-    if (num < 0 || num > 127)
-        vm_err("Failed to execute native function 'int_to_ascii'. Argument 0 constraints: 0 < num <= 127.");
+    int is_negative = raw_num < 0;
+    int64_t num = is_negative ? raw_num * -1 : raw_num;
 
-    char *buffer = vm_memory_alloc(2);
+    int i = 18;
+    char raw_buffer[19];
 
-    buffer[0] = (char)num;
-    buffer[1] = 0;
+    while (i >= 0)
+    {
+        if (num < 10)
+        {
+            raw_buffer[i] = (char)(48 + num);
 
-    Object *new_str_obj = vm_create_object(STR_OTYPE, vm);
-    String *new_str = &new_str_obj->value.string;
+            break;
+        }
 
-    new_str->core = 0;
-    new_str->buffer = buffer;
-    new_str->length = 1;
+        int64_t last = num % 10;
+        int64_t first = num / 10;
 
-    vm_stack_push_object(new_str_obj, vm);
+        raw_buffer[i] = (char)(48 + last);
+        num = first;
+
+        i--;
+    }
+
+    size_t length = is_negative ? 19 - i + 1 : 19 - i;
+    char *buffer = vm_memory_alloc(length + 1);
+
+    memcpy(is_negative ? buffer + 1 : buffer, raw_buffer + i, length);
+
+    if (is_negative)
+        buffer[0] = '-';
+
+    buffer[length] = 0;
+
+    Object *str_obj = vm_create_object(STR_OTYPE, vm);
+    String *str = &str_obj->value.string;
+
+    str->core = 0;
+    str->length = length;
+    str->buffer = buffer;
+
+    vm_stack_push_object(str_obj, vm);
 }
 
 void native_fn_time(DynArr *args, VM *vm)
@@ -646,7 +683,7 @@ void native_fn_read_file(DynArr *args, VM *vm)
     int64_t position = position_holder->entity.literal.i64;
     int64_t size = size_holder->entity.literal.i64;
     int64_t count = count_holder->entity.literal.i64;
-    Array *arr = &buffer_holder->entity.object->value.obj_arr;
+    Array *arr = &buffer_holder->entity.object->value.array;
 
     if (position < 0)
         vm_err("wrong argument 1. Constrains: 0 <= position.");
@@ -788,7 +825,7 @@ void vm_garbage_string(Object *object)
 
 void vm_garbage_object_array(Object *object)
 {
-    Array *arr = &object->value.obj_arr;
+    Array *arr = &object->value.array;
 
     vm_memory_dealloc(arr->items);
 }
@@ -941,7 +978,7 @@ int vm_gc_mark_object_array(Object *object)
 
     size_t count = 0;
 
-    Array *arr = &object->value.obj_arr;
+    Array *arr = &object->value.array;
 
     for (size_t i = 0; i < arr->length; i++)
     {
@@ -1400,7 +1437,7 @@ void vm_print_object_value(Holder *holder)
         break;
 
     case OBJ_ARR_OTYPE:
-        Array *oarr = &holder->entity.object->value.obj_arr;
+        Array *oarr = &holder->entity.object->value.array;
         printf("<object array: %ld> at %p\n", oarr->length, oarr);
         break;
 
@@ -1780,7 +1817,7 @@ void vm_execute_object_array(VM *vm)
     uint8_t is_empty = vm_advance(vm);
 
     Object *arr_obj = vm_create_object(OBJ_ARR_OTYPE, vm);
-    Array *arr = &arr_obj->value.obj_arr;
+    Array *arr = &arr_obj->value.array;
 
     if (len == 0)
     {
@@ -1832,7 +1869,7 @@ void vm_execute_array_length(VM *vm)
     if (object->type != OBJ_ARR_OTYPE)
         vm_err("Failed to get array length: illegal type.");
 
-    vm_stack_push_int((int64_t)object->value.obj_arr.length, vm);
+    vm_stack_push_int((int64_t)object->value.array.length, vm);
 }
 
 void vm_execute_get_array_item(VM *vm)
@@ -1850,7 +1887,7 @@ void vm_execute_get_array_item(VM *vm)
     int64_t index = (int64_t)index_holder->entity.literal.i64;
 
     Object *arr_obj = arr_holder->entity.object;
-    Array *arr = &arr_obj->value.obj_arr;
+    Array *arr = &arr_obj->value.array;
 
     if (index < 0 || (size_t)index >= arr->length)
         vm_err("Failed to get array item. Constraints: 0 < index (%d) < arr_len (%ld).", index, arr->length);
@@ -1879,7 +1916,7 @@ void vm_execute_set_array_item(VM *vm)
     if (!vm_is_holder_array(array_holder))
         vm_err("Failed to assign value to array. Expect a arra, but got something else.");
 
-    Array *array_obj = &array_holder->entity.object->value.obj_arr;
+    Array *array_obj = &array_holder->entity.object->value.array;
 
     if (index < 0 || (size_t)index >= array_obj->length)
         vm_err("Failed to assign value to array. Constraints: 0 < index (%d) < arr_len (%ld).", index, array_obj->length);
@@ -2954,17 +2991,17 @@ VM *vm_create()
     frame->chunks = default_chunks;
 
     //> adding natives
-    vm_add_native("char_code", 2, native_fn_char_code, vm);
-    vm_add_native("code_char", 1, native_fn_code_char, vm);
-    vm_add_native("sub_str", 3, native_fn_sub_str, vm);
+    vm_add_native("ascii", 1, native_fn_ascii, vm);
+    vm_add_native("ascii_code", 2, native_fn_ascii_code, vm);
+    vm_add_native("str_sub", 3, native_fn_str_sub, vm);
     vm_add_native("str_lower", 1, native_fn_str_lower, vm);
     vm_add_native("str_upper", 1, native_fn_str_upper, vm);
     vm_add_native("str_title", 1, native_fn_str_title, vm);
-    vm_add_native("cmp_str", 2, native_fn_cmp_str, vm);
-    vm_add_native("cmp_ic_str", 2, native_fn_cmp_ic_str, vm);
+    vm_add_native("str_cmp", 2, native_fn_str_cmp, vm);
+    vm_add_native("str_cmp_ic", 2, native_fn_str_cmp_ic, vm);
     vm_add_native("is_str_int", 1, native_fn_is_str_int, vm);
-    vm_add_native("ascii_to_int", 1, native_fn_ascii_to_int, vm);
-    vm_add_native("int_to_ascii", 1, native_fn_int_to_ascii, vm);
+    vm_add_native("str_to_int", 1, native_fn_str_to_int, vm);
+    vm_add_native("int_to_str", 1, native_fn_int_to_str, vm);
 
     vm_add_native("time", 0, native_fn_time, vm);
     vm_add_native("sleep", 0, native_fn_sleep, vm);

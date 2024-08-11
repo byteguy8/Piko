@@ -8,8 +8,6 @@
 #include <essentials/dynarr.h>
 #include <essentials/lzhtable.h>
 
-struct _object_;
-
 typedef enum _object_type_
 {
     VALUE_OTYPE,
@@ -29,7 +27,7 @@ typedef struct _string_
     size_t length; // without NULL
 } String;
 
-typedef struct _object_array_
+typedef struct _array_
 {
     size_t length;
     struct _object_ **items;
@@ -45,10 +43,10 @@ typedef struct _native_fn_
 typedef struct _method_
 {
     Fn *fn;
-    struct _object_ *instance;
+    void *instance;
 } Method;
 
-typedef struct _class_instance_
+typedef struct _instance_
 {
     LZHTable *attributes;
     struct _klass_ *klass;
@@ -64,7 +62,7 @@ typedef struct _object_
     {
         Value literal;
         String string;
-        Array obj_arr;
+        Array array;
         Fn *fn;
         NativeFn *native_fn;
         Method method;

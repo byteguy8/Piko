@@ -1256,17 +1256,19 @@ void compiler_compile(VM *vm, DynArrPtr *stmts)
     compiler->natives = natives;
 
     //> vm natives functions
-    dynarr_ptr_insert((void *)memory_clone_raw_str("char_code"), natives);
-    dynarr_ptr_insert((void *)memory_clone_raw_str("code_char"), natives);
-    dynarr_ptr_insert((void *)memory_clone_raw_str("sub_str"), natives);
+    dynarr_ptr_insert((void *)memory_clone_raw_str("ascii"), natives);
+    dynarr_ptr_insert((void *)memory_clone_raw_str("ascii_code"), natives);
+    
+    dynarr_ptr_insert((void *)memory_clone_raw_str("str_sub"), natives);
     dynarr_ptr_insert((void *)memory_clone_raw_str("str_lower"), natives);
     dynarr_ptr_insert((void *)memory_clone_raw_str("str_upper"), natives);
     dynarr_ptr_insert((void *)memory_clone_raw_str("str_title"), natives);
-    dynarr_ptr_insert((void *)memory_clone_raw_str("cmp_str"), natives);
-    dynarr_ptr_insert((void *)memory_clone_raw_str("cmp_ic_str"), natives);
+    dynarr_ptr_insert((void *)memory_clone_raw_str("str_cmp"), natives);
+    dynarr_ptr_insert((void *)memory_clone_raw_str("str_cmp_ic"), natives);
+    
     dynarr_ptr_insert((void *)memory_clone_raw_str("is_str_int"), natives);
-    dynarr_ptr_insert((void *)memory_clone_raw_str("ascii_to_int"), natives);
-    dynarr_ptr_insert((void *)memory_clone_raw_str("int_to_ascii"), natives);
+    dynarr_ptr_insert((void *)memory_clone_raw_str("str_to_int"), natives);
+    dynarr_ptr_insert((void *)memory_clone_raw_str("int_to_str"), natives);
 
     dynarr_ptr_insert((void *)memory_clone_raw_str("time"), natives);
     dynarr_ptr_insert((void *)memory_clone_raw_str("sleep"), natives);
