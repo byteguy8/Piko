@@ -795,6 +795,29 @@ void memory_destroy_whiles_stmt(WhileStmt *stmt)
     memory_dealloc(stmt);
 }
 
+ForStmt *memory_create_for_stmt(Token *identifier_token, Expr *left_expr, Token *operator_token, Expr *right_expr, DynArrPtr *stmts)
+{
+    ForStmt *stmt = (ForStmt *)memory_alloc(sizeof(ForStmt));
+
+    stmt->identifier_token = identifier_token;
+    stmt->left_expr = left_expr;
+    stmt->operator_token = operator_token;
+    stmt->right_expr = right_expr;
+    stmt->stmts = stmts;
+
+    return stmt;
+}
+
+void memory_destroy_for_stmt(ForStmt *stmt)
+{
+    if (!stmt)
+        return;
+
+    memset(stmt, 0, sizeof(ForStmt));
+
+    memory_dealloc(stmt);
+}
+
 FnStmt *memory_create_fn_stmt(Token *identifier, DynArrPtr *params, DynArrPtr *stmts)
 {
     FnStmt *stmt = (FnStmt *)memory_alloc(sizeof(FnStmt));

@@ -114,7 +114,7 @@ int32_t vm_read_i32(VM *vm);
 // vm realted
 Object *vm_create_object(ObjectType type, VM *vm);
 DynArr *vm_current_chunks(VM *vm);
-void vm_jmp(int32_t jmp_value, VM *vm);
+void vm_jmp(int32_t jmp_value, int32_t from, VM *vm);
 void vm_print_value(Value *value);
 void vm_print_stack_value(Holder *holder);
 void vm_print_object_value(Holder *holder);
@@ -1367,10 +1367,10 @@ DynArr *vm_current_chunks(VM *vm)
     return (DynArr *)lzstack_peek(vm->blocks_stack, NULL);
 }
 
-void vm_jmp(int32_t jmp_value, VM *vm)
+void vm_jmp(int32_t jmp_value, int32_t from, VM *vm)
 {
     Frame *frame = VM_FRAME_CURRENT(vm);
-    size_t current_ip = frame->ip;
+    size_t current_ip = from;
 
     if (jmp_value == 0)
         return;
@@ -2067,13 +2067,13 @@ void vm_execute_argjmp(int type, VM *vm)
         // jump if true
     case 1:
         if (value == 1)
-            vm_jmp(jmp_value, vm);
+            vm_jmp(jmp_value, VM_FRAME_CURRENT(vm)->ip - 5, vm);
         break;
 
         // jump if false
     case 2:
         if (value == 0)
-            vm_jmp(jmp_value, vm);
+            vm_jmp(jmp_value, VM_FRAME_CURRENT(vm)->ip, vm);
         break;
 
     default:
@@ -2423,13 +2423,17 @@ void vm_execute_is(VM *vm)
 
 void vm_execute_from(VM *vm)
 {
-    Holder *instance_holder = vm_stack_pop(vm);
+    Holder *holder = vm_stack_pop(vm);
     char *klass_name = vm_read_string(vm);
 
-    if (!vm_is_holder_instance(instance_holder))
-        vm_err("Failed to execute from. Expect instance, but got something else.");
+    if (!vm_is_holder_instance(holder))
+    {
+        vm_stack_push_bool(0, vm);
 
-    Instance *instance = &instance_holder->entity.object->value.instance;
+        return;
+    }
+
+    Instance *instance = &holder->entity.object->value.instance;
     Klass *klass = instance->klass;
 
     vm_stack_push_bool((uint8_t)strcmp(klass->name, klass_name) == 0, vm);

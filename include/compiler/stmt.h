@@ -11,6 +11,7 @@ typedef enum _stmt_type_
     CONTINUE_STMT_TYPE,
     BREAK_STMT_TYPE,
     WHILE_STMT_TYPE,
+    FOR_STMT_TYPE,
     FN_STMT_TYPE,
     CLASS_STMT_TYPE,
     PRINT_STMT_TYPE,
@@ -63,6 +64,15 @@ typedef struct _while_stmt_
     Expr *condition;
     DynArrPtr *stmts;
 } WhileStmt;
+
+typedef struct _for_stmt_
+{
+    Token *identifier_token;
+    Expr *left_expr;
+    Token *operator_token;
+    Expr *right_expr;
+    DynArrPtr *stmts;
+} ForStmt;
 
 typedef struct _fn_stmt_
 {

@@ -50,8 +50,8 @@ typedef struct _compiler_
 
     DynArrPtr *stmts;
 
-    LZStack *continues;
-    LZStack *breaks;
+    DynArr *continues;
+    DynArr *breaks;
 
     DynArrPtr *natives;
 } Compiler;

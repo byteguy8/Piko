@@ -60,6 +60,7 @@ void compiler_if_stmt(IfStmt *stmt);
 void compiler_continue_stmt(ContinueStmt *stmt);
 void compiler_break_stmt(BreakStmt *stmt);
 void compiler_while_stmt(WhileStmt *stmt);
+void compiler_for_stmt(ForStmt *stmt);
 void compiler_fn_stmt(FnStmt *stmt);
 void compiler_klass_stmt(ClassStmt *stmt);
 void compiler_print_stmt(PrintStmt *stmt);
@@ -152,16 +153,16 @@ int compiler_scope_inside_loop()
         SymbolStack *scope = &compiler->scope_stack[i];
 
         if (scope->type == FN_SCOPE)
-            return 0;
+            return -1;
 
         if (scope->type == KLASS_SCOPE)
-            return 0;
+            return -1;
 
         if (scope->type == WHILE_SCOPE)
-            return 1;
+            return i;
     }
 
-    return 0;
+    return -1;
 }
 
 int compiler_scope_inside_fn()
@@ -225,8 +226,8 @@ void compiler_assign_expr(AssignExpr *expr)
         char *identifier = identifier_token->lexeme;
 
         compiler_expr(right);
+        compiler_expr(access_expr->left);
 
-        vm_write_chunk(THIS_OPC, COMPILER_VM);
         vm_write_chunk(SET_PROPERTY_OPC, COMPILER_VM);
         vm_write_str_const(identifier, COMPILER_VM);
 
@@ -239,22 +240,25 @@ void compiler_assign_expr(AssignExpr *expr)
         Token *identifier_token = this_expr->identifier_token;
         int klass_scope = compiler_scope_inside_klass();
 
-        if (identifier_token && klass_scope != -1)
-        {
-            char *identifier = identifier_token->lexeme;
-            Symbol *symbol = compiler_symbol_at(klass_scope, identifier_token->lexeme);
+        if (!identifier_token)
+            compiler_error_at(this_expr->this_token, "Illegal assignment target. 'this' expression doesn't have target.");
 
-            if (!symbol)
-                compiler_declare_depth(0, klass_scope, identifier_token)->class_bound = 1;
+        if (klass_scope == -1)
+            compiler_error_at(this_expr->this_token, "Illegal assignment target. 'this' expressions can't be used outside classes scope.");
 
-            compiler_expr(right);
+        char *identifier = identifier_token->lexeme;
+        Symbol *symbol = compiler_symbol_at(klass_scope, identifier_token->lexeme);
 
-            vm_write_chunk(THIS_OPC, COMPILER_VM);
-            vm_write_chunk(SET_PROPERTY_OPC, COMPILER_VM);
-            vm_write_str_const(identifier, COMPILER_VM);
+        if (!symbol)
+            compiler_declare_depth(0, klass_scope, identifier_token)->class_bound = 1;
 
-            return;
-        }
+        compiler_expr(right);
+
+        vm_write_chunk(THIS_OPC, COMPILER_VM);
+        vm_write_chunk(SET_PROPERTY_OPC, COMPILER_VM);
+        vm_write_str_const(identifier, COMPILER_VM);
+
+        return;
     }
 
     if (left->type == ARR_ACCESS_EXPR_TYPE)
@@ -895,7 +899,9 @@ void compiler_if_stmt(IfStmt *stmt)
 
 void compiler_continue_stmt(ContinueStmt *stmt)
 {
-    if (!compiler_scope_inside_loop())
+    int scope = compiler_scope_inside_loop();
+
+    if (scope == -1)
         compiler_error_at(stmt->continue_token, "Can only use 'continue' statement inside native loops.");
 
     vm_write_chunk(JMP_OPC, COMPILER_VM);
@@ -903,17 +909,20 @@ void compiler_continue_stmt(ContinueStmt *stmt)
 
     size_t len = vm_block_length(COMPILER_VM);
 
-    size_t *info = (size_t *)memory_alloc(sizeof(size_t) * 2);
+    size_t *info = (size_t *)memory_alloc(sizeof(size_t) * 3);
 
     info[0] = len;
     info[1] = jmp_index;
+    info[2] = scope;
 
-    lzstack_push((void *)info, compiler->continues, NULL);
+    dynarr_insert((void *)info, compiler->continues);
 }
 
 void compiler_break_stmt(BreakStmt *stmt)
 {
-    if (!compiler_scope_inside_loop())
+    int scope = compiler_scope_inside_loop();
+
+    if (scope == -1)
         compiler_error_at(stmt->break_token, "Can only use 'break' statement inside native loops.");
 
     vm_write_chunk(JMP_OPC, COMPILER_VM);
@@ -925,8 +934,9 @@ void compiler_break_stmt(BreakStmt *stmt)
 
     info[0] = len;
     info[1] = jmp_index;
+    info[2] = scope;
 
-    lzstack_push((void *)info, compiler->breaks, NULL);
+    dynarr_insert((void *)info, compiler->breaks);
 }
 
 void compiler_while_stmt(WhileStmt *stmt)
@@ -934,14 +944,14 @@ void compiler_while_stmt(WhileStmt *stmt)
     Expr *condition = stmt->condition;
     DynArrPtr *stmts = stmt->stmts;
 
-    size_t bef_while_len = vm_block_length(COMPILER_VM);
-
     vm_write_chunk(JMP_OPC, COMPILER_VM);
     size_t jmp_index = vm_write_i32(0, COMPILER_VM);
 
-    size_t bef_loop_body_len = vm_block_length(COMPILER_VM);
+    size_t len_before_body = vm_block_length(COMPILER_VM);
 
     compiler_scope_in(WHILE_SCOPE);
+
+    int while_scope = compiler->depth;
 
     for (size_t i = 0; i < stmts->used; i++)
     {
@@ -951,45 +961,166 @@ void compiler_while_stmt(WhileStmt *stmt)
 
     compiler_scope_out();
 
-    size_t after_loop_body_len = vm_block_length(COMPILER_VM);
-    size_t loop_body_len = after_loop_body_len - bef_loop_body_len;
+    size_t len_after_body = vm_block_length(COMPILER_VM);
+    size_t body_len = len_after_body - len_before_body;
 
-    vm_update_i32(jmp_index, loop_body_len, COMPILER_VM);
+    vm_update_i32(jmp_index, body_len, COMPILER_VM);
 
+    size_t len_before_header = vm_block_length(COMPILER_VM);
     compiler_expr(condition);
-
-    size_t after_while_len = vm_block_length(COMPILER_VM);
-    size_t while_len = after_while_len - bef_while_len;
+    size_t len_after_header = vm_block_length(COMPILER_VM);
+    size_t header_len = len_after_header - len_before_header;
 
     vm_write_chunk(JIT_OPC, COMPILER_VM);
-    vm_write_i32(while_len * -1, COMPILER_VM);
+    vm_write_i32(-(header_len + body_len), COMPILER_VM);
 
     size_t after_whole_while_len = vm_block_length(COMPILER_VM);
 
-    size_t *continue_info = (size_t *)lzstack_pop(compiler->continues);
+    DynArr *continues = compiler->continues;
 
-    while (continue_info)
+    for (size_t i = 0; i < continues->used; i++)
     {
-        size_t len = continue_info[0];
-        size_t index = continue_info[1];
+        size_t *info = dynarr_get(i, continues);
 
-        vm_update_i32(index, after_loop_body_len - len, COMPILER_VM);
+        size_t len = info[0];
+        size_t index = info[1];
+        int scope = (int)info[2];
 
-        memory_dealloc(continue_info);
-        continue_info = (size_t *)lzstack_pop(compiler->continues);
+        if (while_scope != scope)
+            continue;
+
+        vm_update_i32(index, len_after_body - len, COMPILER_VM);
+        dynarr_remove_index(i, continues);
     }
 
-    size_t *break_info = (size_t *)lzstack_pop(compiler->breaks);
+    DynArr *breaks = compiler->breaks;
 
-    while (break_info)
+    for (size_t i = 0; i < breaks->used; i++)
     {
-        size_t len = break_info[0];
-        size_t index = break_info[1];
+        size_t *info = dynarr_get(i, breaks);
+
+        size_t len = info[0];
+        size_t index = info[1];
+        int scope = (int)info[2];
+
+        if (while_scope != scope)
+            continue;
 
         vm_update_i32(index, after_whole_while_len - len, COMPILER_VM);
+        dynarr_remove_index(i, breaks);
+    }
+}
 
-        memory_dealloc(break_info);
-        break_info = (size_t *)lzstack_pop(compiler->breaks);
+void compiler_for_stmt(ForStmt *stmt)
+{
+    Token *identifier_token = stmt->identifier_token;
+    Expr *left_expr = stmt->left_expr;
+    Token *operator_token = stmt->operator_token;
+    Expr *right_expr = stmt->right_expr;
+    DynArrPtr *stmts = stmt->stmts;
+
+    int up = operator_token->type == UP_TOKTYPE;
+
+    compiler_scope_in(WHILE_SCOPE);
+    int for_scope = compiler->depth;
+
+    Symbol *symbol = compiler_declare(0, identifier_token);
+
+    compiler_expr(left_expr);
+
+    vm_write_chunk(LSET_OPC, COMPILER_VM);
+    vm_write_chunk(symbol->local, COMPILER_VM);
+    vm_write_chunk(POP_OPC, COMPILER_VM);
+
+    vm_write_chunk(JMP_OPC, COMPILER_VM);
+    size_t jmp_index = vm_write_i32(0, COMPILER_VM);
+
+    size_t len_before_body = vm_block_length(COMPILER_VM);
+
+    for (size_t i = 0; i < stmts->used; i++)
+    {
+        Stmt *s = (Stmt *)DYNARR_PTR_GET(i, stmts);
+        compiler_stmt(s);
+    }
+
+    compiler_scope_out();
+
+    size_t len_before_increment = vm_block_length(COMPILER_VM);
+
+    //> increment/decrement section
+    vm_write_chunk(LREAD_OPC, COMPILER_VM);
+    vm_write_chunk(symbol->local, COMPILER_VM);
+
+    vm_write_chunk(ICONST_OPC, COMPILER_VM);
+    vm_write_i64_const(1, COMPILER_VM);
+
+    if (up)
+        vm_write_chunk(ADD_OPC, COMPILER_VM);
+    else
+        vm_write_chunk(SUB_OPC, COMPILER_VM);
+
+    vm_write_chunk(LSET_OPC, COMPILER_VM);
+    vm_write_chunk(symbol->local, COMPILER_VM);
+    vm_write_chunk(POP_OPC, COMPILER_VM);
+    //< increment/decrement section
+
+    size_t len_after_body = vm_block_length(COMPILER_VM);
+    size_t body_len = len_after_body - len_before_body;
+
+    vm_update_i32(jmp_index, body_len, COMPILER_VM);
+
+    size_t len_before_header = vm_block_length(COMPILER_VM);
+
+    vm_write_chunk(LREAD_OPC, COMPILER_VM);
+    vm_write_chunk(symbol->local, COMPILER_VM);
+
+    compiler_expr(right_expr);
+
+    if (up)
+        vm_write_chunk(LT_OPC, COMPILER_VM);
+    else
+        vm_write_chunk(GE_OPC, COMPILER_VM);
+
+    size_t len_after_header = vm_block_length(COMPILER_VM);
+    size_t header_len = len_after_header - len_before_header;
+
+    vm_write_chunk(JIT_OPC, COMPILER_VM);
+    vm_write_i32(-(header_len + body_len), COMPILER_VM);
+
+    size_t after_for_body = vm_block_length(COMPILER_VM);
+
+    DynArr *continues = compiler->continues;
+
+    for (size_t i = 0; i < continues->used; i++)
+    {
+        size_t *info = dynarr_get(i, continues);
+
+        size_t len = info[0];
+        size_t index = info[1];
+        int scope = (int)info[2];
+
+        if (for_scope != scope)
+            continue;
+
+        vm_update_i32(index, len_before_increment - len, COMPILER_VM);
+        dynarr_remove_index(i, continues);
+    }
+
+    DynArr *breaks = compiler->breaks;
+
+    for (size_t i = 0; i < breaks->used; i++)
+    {
+        size_t *info = dynarr_get(i, breaks);
+
+        size_t len = info[0];
+        size_t index = info[1];
+        int scope = (int)info[2];
+
+        if (for_scope != scope)
+            continue;
+
+        vm_update_i32(index, after_for_body - len, COMPILER_VM);
+        dynarr_remove_index(i, breaks);
     }
 }
 
@@ -1207,6 +1338,10 @@ void compiler_stmt(Stmt *stmt)
         compiler_while_stmt((WhileStmt *)stmt->s);
         break;
 
+    case FOR_STMT_TYPE:
+        compiler_for_stmt((ForStmt *)stmt->s);
+        break;
+
     case FN_STMT_TYPE:
         compiler_fn_stmt((FnStmt *)stmt->s);
         break;
@@ -1232,8 +1367,8 @@ void compiler_stmt(Stmt *stmt)
 void compiler_compile(VM *vm, DynArrPtr *stmts)
 {
     LZHTable *symbols = memory_create_lzhtable(1669);
-    LZStack *continues = memory_create_lzstack();
-    LZStack *breaks = memory_create_lzstack();
+    DynArr *continues = memory_create_dynarr(sizeof(size_t) * 3);
+    DynArr *breaks = memory_create_dynarr(sizeof(size_t) * 3);
     DynArrPtr *natives = memory_create_dynarr_ptr();
 
     compiler = memory_create_compiler();
@@ -1258,14 +1393,14 @@ void compiler_compile(VM *vm, DynArrPtr *stmts)
     //> vm natives functions
     dynarr_ptr_insert((void *)memory_clone_raw_str("ascii"), natives);
     dynarr_ptr_insert((void *)memory_clone_raw_str("ascii_code"), natives);
-    
+
     dynarr_ptr_insert((void *)memory_clone_raw_str("str_sub"), natives);
     dynarr_ptr_insert((void *)memory_clone_raw_str("str_lower"), natives);
     dynarr_ptr_insert((void *)memory_clone_raw_str("str_upper"), natives);
     dynarr_ptr_insert((void *)memory_clone_raw_str("str_title"), natives);
     dynarr_ptr_insert((void *)memory_clone_raw_str("str_cmp"), natives);
     dynarr_ptr_insert((void *)memory_clone_raw_str("str_cmp_ic"), natives);
-    
+
     dynarr_ptr_insert((void *)memory_clone_raw_str("is_str_int"), natives);
     dynarr_ptr_insert((void *)memory_clone_raw_str("str_to_int"), natives);
     dynarr_ptr_insert((void *)memory_clone_raw_str("int_to_str"), natives);
@@ -1359,8 +1494,8 @@ void compiler_compile(VM *vm, DynArrPtr *stmts)
     }
 
     memory_destroy_lzhtable(symbols);
-    memory_destroy_lzstack(continues);
-    memory_destroy_lzstack(breaks);
+    memory_destroy_dynarr(continues);
+    memory_destroy_dynarr(breaks);
     memory_destroy_compiler(compiler);
 
     compiler = NULL;

@@ -22,8 +22,8 @@ Token *parser_consume(Parser *parser, TokenType type, char *err_msg, ...);
 
 Expr *parser_expr(Parser *parser);
 Expr *parser_assign_expr(Parser *parser);
-Expr *parser_type_expr(Parser *parser);
 Expr *parser_arr_expr(Parser *parser);
+Expr *parser_type_expr(Parser *parser);
 Expr *parser_bit_or(Parser *parser);
 Expr *parser_bit_xor(Parser *parser);
 Expr *parser_bit_and(Parser *parser);
@@ -36,7 +36,6 @@ Expr *parser_term_expr(Parser *parser);
 Expr *parser_factor_expr(Parser *parser);
 Expr *parser_unary_expr(Parser *parser);
 Expr *parser_access_expr(Parser *parser);
-Expr *parser_call_expr(Parser *parser);
 Expr *parser_this_expr(Parser *parser);
 Expr *parser_literal_expr(Parser *parser);
 
@@ -48,6 +47,7 @@ Stmt *parser_if_stmt(Parser *parser);
 Stmt *parser_continue_stmt(Parser *parser);
 Stmt *parser_break_stmt(Parser *parser);
 Stmt *parser_while_stmt(Parser *parser);
+Stmt *parser_for_stmt(Parser *parser);
 Stmt *parser_fn_stmt(Parser *parser);
 Stmt *parser_class_stmt(Parser *parser);
 Stmt *parser_print_stmt(Parser *parser);
@@ -149,7 +149,7 @@ Token *parser_consume(Parser *parser, TokenType type, char *err_msg, ...)
     va_list args;
     va_start(args, err_msg);
 
-    report_error(17, "Parser", err_msg, args);
+    report_error_at(17, token->line, "Parser", err_msg, args);
 
     va_end(args);
 
@@ -163,7 +163,7 @@ Expr *parser_expr(Parser *parser)
 
 Expr *parser_assign_expr(Parser *parser)
 {
-    Expr *left = parser_type_expr(parser);
+    Expr *left = parser_arr_expr(parser);
 
     if (parser_match(parser, 1, EQUALS_TOKTYPE))
     {
@@ -220,23 +220,6 @@ Expr *parser_from_expr(Expr *left, Token *from_token, Parser *parser)
     return memory_create_expr(expr, FROM_EXPR_TYPE);
 }
 
-Expr *parser_type_expr(Parser *parser)
-{
-    Expr *left = parser_arr_expr(parser);
-
-    if (parser_match(parser, 2, IS_TOKTYPE, FROM_TOKTYPE))
-    {
-        Token *previous_token = parser_previous(parser);
-
-        if (previous_token->type == IS_TOKTYPE)
-            return parser_is_expr(left, previous_token, parser);
-        else
-            return parser_from_expr(left, previous_token, parser);
-    }
-
-    return left;
-}
-
 Expr *parser_arr_expr(Parser *parser)
 {
     if (parser_match(parser, 1, LEFT_SQUARE_TOKTYPE))
@@ -263,7 +246,24 @@ Expr *parser_arr_expr(Parser *parser)
         return memory_create_expr(expr, ARR_EXPR_TYPE);
     }
 
-    return parser_bit_or(parser);
+    return parser_type_expr(parser);
+}
+
+Expr *parser_type_expr(Parser *parser)
+{
+    Expr *left = parser_bit_or(parser);
+
+    if (parser_match(parser, 2, IS_TOKTYPE, FROM_TOKTYPE))
+    {
+        Token *previous_token = parser_previous(parser);
+
+        if (previous_token->type == IS_TOKTYPE)
+            return parser_is_expr(left, previous_token, parser);
+        else
+            return parser_from_expr(left, previous_token, parser);
+    }
+
+    return left;
 }
 
 Expr *parser_bit_or(Parser *parser)
@@ -472,7 +472,7 @@ Expr *parser_access_expr(Parser *parser)
         {
             do
             {
-                Expr *index_expr = parser_factor_expr(parser);
+                Expr *index_expr = parser_term_expr(parser);
                 Token *left_square_index = memory_clone_token(previous);
                 ArrAccessExpr *expr = memory_create_arr_access_expr(left, left_square_index, index_expr);
 
@@ -646,6 +646,9 @@ Stmt *parser_stmt(Parser *parser)
     if (parser_match(parser, 1, WHILE_TOKTYPE))
         return parser_while_stmt(parser);
 
+    if (parser_match(parser, 1, FOR_TOKTYPE))
+        return parser_for_stmt(parser);
+
     if (parser_match(parser, 1, PROC_TOKTYPE))
         return parser_fn_stmt(parser);
 
@@ -696,7 +699,7 @@ IfStmtBranch *parser_if_branch(Parser *parser)
 {
     parser_consume(parser, LEFT_PARENTHESIS_TOKTYPE, "Expect '(' at start of branch condition.");
 
-    Expr *condition = parser_or_expr(parser);
+    Expr *condition = parser_type_expr(parser);
 
     parser_consume(parser, RIGHT_PARENTHESIS_TOKTYPE, "Expect ')' at end of branch condition.");
     parser_consume(parser, LEFT_BRACKET_TOKTYPE, "Expect '{' at start of branch body.");
@@ -760,7 +763,7 @@ Stmt *parser_while_stmt(Parser *parser)
 
     parser_consume(parser, LEFT_PARENTHESIS_TOKTYPE, "Expect '(' after 'while' keyword.");
 
-    condition = parser_or_expr(parser);
+    condition = parser_type_expr(parser);
 
     parser_consume(parser, RIGHT_PARENTHESIS_TOKTYPE, "Expect ')' at end of while statement condition.");
     parser_consume(parser, LEFT_BRACKET_TOKTYPE, "Expect '{' at start of while body.");
@@ -785,6 +788,39 @@ DynArrPtr *fn_params(Parser *parser)
     } while (parser_match(parser, 1, COMMA_TOKTYPE));
 
     return params;
+}
+
+Stmt *parser_for_stmt(Parser *parser)
+{
+    Token *identifier_token = NULL;
+    Expr *left_expr = NULL;
+    Token *operator_token = NULL;
+    Expr *right_expr = NULL;
+    DynArrPtr *stmts = NULL;
+
+    parser_consume(parser, LEFT_PARENTHESIS_TOKTYPE, "Expect '(' at start of for header.");
+
+    identifier_token = parser_consume(parser, IDENTIFIER_TOKTYPE, "Expect identifier.");
+    identifier_token = memory_clone_token(identifier_token);
+
+    parser_consume(parser, IN_TOKTYPE, "Expect 'in' keyword after identifier.");
+    left_expr = parser_term_expr(parser);
+
+    if (parser_match(parser, 2, DOWN_TOKTYPE, UP_TOKTYPE))
+        operator_token = memory_clone_token(parser_previous(parser));
+
+    if (!operator_token)
+        parser_error_at(parser_peek(parser), "Expect 'down' or 'up', but got something else.");
+
+    right_expr = parser_term_expr(parser);
+    parser_consume(parser, RIGHT_PARENTHESIS_TOKTYPE, "Expect ')' at end of for header.");
+
+    parser_consume(parser, LEFT_BRACKET_TOKTYPE, "Expect '{' at start of for body.");
+    stmts = parser_block_stmt(parser);
+
+    ForStmt *stmt = memory_create_for_stmt(identifier_token, left_expr, operator_token, right_expr, stmts);
+
+    return memory_create_stmt(stmt, FOR_STMT_TYPE);
 }
 
 Stmt *parser_fn_stmt(Parser *parser)

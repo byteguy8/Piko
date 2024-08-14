@@ -126,6 +126,9 @@ void memory_destroy_break_stmt(BreakStmt *stmt);
 WhileStmt *memory_create_while_stmt(Expr *condition, DynArrPtr *stmts);
 void memory_destroy_whiles_stmt(WhileStmt *stmt);
 
+ForStmt *memory_create_for_stmt(Token *identifier_token, Expr *left_expr, Token *operator_token, Expr *right_expr, DynArrPtr *stmts);
+void memory_destroy_for_stmt(ForStmt *stmt);
+
 FnStmt *memory_create_fn_stmt(Token *identifier, DynArrPtr *params, DynArrPtr *stmts);
 void memory_destroy_fn_stmt(FnStmt *stmt);
 

@@ -386,11 +386,16 @@ int scanner_scan_tokens(Scanner *scanner)
     scanner_add_keyword("elif", ELIF_TOKTYPE, keywords);
     scanner_add_keyword("else", ELSE_TOKTYPE, keywords);
     scanner_add_keyword("while", WHILE_TOKTYPE, keywords);
+    scanner_add_keyword("for", FOR_TOKTYPE, keywords);
     scanner_add_keyword("break", BREAK_TOKTYPE, keywords);
     scanner_add_keyword("continue", CONTINUE_TOKTYPE, keywords);
     scanner_add_keyword("print", PRINT_TOKTYPE, keywords);
     scanner_add_keyword("proc", PROC_TOKTYPE, keywords);
     scanner_add_keyword("ret", RETURN_TOKTYPE, keywords);
+
+    scanner_add_keyword("in", IN_TOKTYPE, keywords);
+    scanner_add_keyword("up", UP_TOKTYPE, keywords);
+    scanner_add_keyword("down", DOWN_TOKTYPE, keywords);
 
     scanner_add_keyword("is", IS_TOKTYPE, keywords);
     scanner_add_keyword("from", FROM_TOKTYPE, keywords);
