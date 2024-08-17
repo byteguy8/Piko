@@ -26,6 +26,8 @@ void scanner_add_token_literal(void *literal, size_t literal_size, TokenType typ
 void scanner_add_token(TokenType type, Scanner *scanner);
 
 int64_t scanner_lexeme_to_i64(char *lexeme, Scanner *scanner);
+
+void scanner_comment(Scanner *scanner);
 void scanner_number(Scanner *scanner);
 void scanner_string(Scanner *scanner);
 void scanner_identifier(Scanner *scanner);
@@ -166,6 +168,12 @@ int64_t scanner_lexeme_to_i64(char *lexeme, Scanner *scanner)
     return value;
 }
 
+void scanner_comment(Scanner *scanner)
+{
+    while (!scanner_is_at_end(scanner) && scanner_peek(scanner) != '\n')
+        scanner_advance(scanner);
+}
+
 void scanner_number(Scanner *scanner)
 {
     while (!scanner_is_at_end(scanner) && scanner_is_digit(scanner_peek(scanner)))
@@ -248,10 +256,6 @@ void scanner_scan_token(Scanner *scanner)
         scanner_add_token(ASTERISK_TOKTYPE, scanner);
         break;
 
-    case '/':
-        scanner_add_token(SLASH_TOKTYPE, scanner);
-        break;
-
     case '%':
         scanner_add_token(PERCENT_TOKTYPE, scanner);
         break;
@@ -294,6 +298,14 @@ void scanner_scan_token(Scanner *scanner)
 
     case ';':
         scanner_add_token(SEMICOLON_TOKTYPE, scanner);
+        break;
+
+    case '/':
+        if (scanner_match('/', scanner))
+            scanner_comment(scanner);
+        else
+            scanner_add_token(SLASH_TOKTYPE, scanner);
+
         break;
 
     case '|':
