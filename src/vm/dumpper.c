@@ -210,21 +210,21 @@ void dumpper_execute_raw_instruction(uint8_t instruction)
         {
             Fn *fn = (Fn *)symbol->raw_symbol;
 
-            printf("LOAD function %d '%s'\n", entity_index, fn->name);
+            printf("LOAD function %d '%s' %d\n", entity_index, fn->name, entity_index);
         }
 
         if (symbol->type == NATIVE_SYMTYPE)
         {
             NativeFn *native_fn = (NativeFn *)symbol->raw_symbol;
 
-            printf("LOAD Native function %d '%s'\n", entity_index, native_fn->name);
+            printf("LOAD Native function %d '%s' %d\n", entity_index, native_fn->name, entity_index);
         }
 
         if (symbol->type == CLASS_SYMTYPE)
         {
             Klass *klass = (Klass *)symbol->raw_symbol;
 
-            printf("LOAD klass %d '%s'\n", entity_index, klass->name);
+            printf("LOAD klass %d '%s' %d\n", entity_index, klass->name, entity_index);
         }
 
         break;
@@ -572,7 +572,7 @@ void dumpper_dump_functions(VM *vm)
         {
             Fn *fn = (Fn *)entity->raw_symbol;
 
-            printf("//> %s\n", fn->name);
+            printf("//> %s %ld\n", fn->name, i);
 
             dumpper_execute_chunks(fn->chunks);
 

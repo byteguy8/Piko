@@ -19,12 +19,26 @@
 #define VM_STACK_LENGTH 255
 #define VM_FRAME_LENGTH 255
 
+typedef enum _entity_info_type_
+{
+    FUNCTION_ENTINFTYPE,
+    CONSTRUCTOR_ENTINFTYPE,
+    METHOD_ENTINFTYPE,
+} EntityInfoType;
+
+typedef struct _entity_info_
+{
+    int index;
+    void *raw_entity;
+    EntityInfoType type;
+} EntityInfo;
+
 typedef enum _entity_type_
 {
-    FUNCTION_SYMTYPE,
     NATIVE_SYMTYPE,
+    FUNCTION_SYMTYPE,
     CLASS_SYMTYPE
-} SymbolType;
+} EntityType;
 
 typedef struct _entity_
 {
