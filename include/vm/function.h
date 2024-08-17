@@ -6,8 +6,6 @@
 
 #define CLOSURE_LOCALS_LENGTH 255
 
-typedef struct _holder_ Holder;
-
 typedef struct _fn_
 {
     char *name;

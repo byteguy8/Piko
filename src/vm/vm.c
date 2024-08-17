@@ -79,7 +79,7 @@ void vm_gc_sweep_objects(VM *vm);
 int vm_gc_mark_object_array(Object *object);
 int vm_gc_mark_instance(Object *object);
 int vm_gc_mark_object(Object *object);
-int vm_gc_mark_frame_values(Holder *values);
+int vm_gc_mark_frame_values(Value *values);
 int vm_gc_mark_frames(VM *vm);
 int vm_gc_mark_stack(VM *vm);
 int vm_gc_mark_globals(VM *vm);
@@ -89,20 +89,19 @@ void vm_gc(VM *vm);
 //< garbage collector
 
 //> helpers
-int vm_is_holder_nil(Holder *holder);
-int vm_is_holder_value(Holder *holder, Value **out_value);
-int vm_is_holder_bool(Holder *holder, Value **out_value);
-int vm_is_holder_int(Holder *holder, Value **out_value);
-int vm_is_holder_string(Holder *holder);
-int vm_is_holder_obj_value(Holder *holder);
-int vm_is_holder_array(Holder *holder);
-int vm_is_holder_fn(Holder *holder);
-int vm_is_holder_native_fn(Holder *holder);
-int vm_is_holder_method(Holder *holder);
-int vm_is_holder_klass(Holder *holder);
-int vm_is_holder_instance(Holder *holder);
-
-int vm_is_holder_callable(Holder *holder);
+int vm_is_value_nil(Value *value);
+int vm_is_value_primitive(Value *value, Primitive **out_primitive);
+int vm_is_value_bool(Value *value, Primitive **out_primitive);
+int vm_is_value_int(Value *value, Primitive **out_primitive);
+int vm_is_value_string(Value *value);
+int vm_is_value_obj_value(Value *value);
+int vm_is_value_array(Value *value);
+int vm_is_value_fn(Value *value);
+int vm_is_value_native_fn(Value *value);
+int vm_is_value_method(Value *value);
+int vm_is_value_klass(Value *value);
+int vm_is_value_callable(Value *value);
+int vm_is_value_instance(Value *value);
 
 Object *vm_create_method(Object *instance, Fn *function, VM *vm);
 inline void vm_validate_opcode(char *code, size_t length, VM *vm);
@@ -115,10 +114,10 @@ int32_t vm_read_i32(VM *vm);
 Object *vm_create_object(ObjectType type, VM *vm);
 DynArr *vm_current_chunks(VM *vm);
 void vm_jmp(int32_t jmp_value, int32_t from, VM *vm);
+void vm_print_primitive(Primitive *primitive);
+void vm_print_stack_value(Value *value);
+void vm_print_object_value(Value *value);
 void vm_print_value(Value *value);
-void vm_print_stack_value(Holder *holder);
-void vm_print_object_value(Holder *holder);
-void vm_print_holder(Holder *holder);
 int vm_is_at_end(VM *vm);
 
 uint8_t vm_read_bconst(VM *vm);
@@ -135,7 +134,7 @@ void vm_frame_up(Fn *fn, Object *instance, int is_constructor, VM *vm);
 void vm_frame_down(VM *vm);
 
 void vm_frame_read(size_t index, VM *vm);
-void vm_frame_write(int32_t index, Holder *holder, VM *vm);
+void vm_frame_write(int32_t index, Value *value, VM *vm);
 
 uint8_t vm_advance(VM *vm);
 //< frame
@@ -143,25 +142,25 @@ uint8_t vm_advance(VM *vm);
 //> stack
 #define VM_STACK_SIZE(vm) (vm->stack_ptr)
 #define VM_STACK_PTR(vm) (VM_STACK_SIZE(vm) - 1)
-Holder *vm_stack_validate_callable(int args_count, VM *vm);
+Value *vm_stack_validate_callable(int args_count, VM *vm);
 DynArr *vm_stack_pop_args(int args_count, VM *vm);
-Holder *vm_stack_check_at(int index, VM *vm);
-Holder *vm_stack_peek(int index, VM *vm);
+Value *vm_stack_check_at(int index, VM *vm);
+Value *vm_stack_peek(int index, VM *vm);
 void vm_stack_check_overflow(VM *vm);
 void vm_stack_set_obj(int at, Object *obj, VM *vm);
 
-void vm_stack_push_bool(uint8_t value, VM *vm);
-void vm_stack_push_int(int64_t value, VM *vm);
 void vm_stack_push_nil(VM *vm);
+void vm_stack_push_bool(uint8_t primitive, VM *vm);
+void vm_stack_push_int(int64_t primitive, VM *vm);
 void vm_stack_push_object(Object *object, VM *vm);
-void vm_stack_push_holder(Holder *holder, VM *vm);
+void vm_stack_push_value(Value *value, VM *vm);
 
-Holder *vm_stack_pop(VM *vm);
+Value *vm_stack_pop(VM *vm);
 //< stack
 
 //> globals
-void vm_globals_write(char *identifier, Holder *holder, VM *vm);
-Holder *vm_globals_read(char *identifier, VM *vm);
+void vm_globals_write(char *identifier, Value *value, VM *vm);
+Value *vm_globals_read(char *identifier, VM *vm);
 //< stack
 
 //> instructions
@@ -169,7 +168,7 @@ void vm_execute_nil(VM *vm);
 void vm_execute_bool(VM *vm);
 void vm_execute_int(VM *vm);
 void vm_execute_string(VM *vm);
-void vm_execute_object_array(VM *vm);
+void vm_execute_array(VM *vm);
 void vm_execute_array_length(VM *vm);
 void vm_execute_get_array_item(VM *vm);
 void vm_execute_set_array_item(VM *vm);
@@ -204,29 +203,28 @@ void vm_execute_return(VM *vm);
 void vm_execute_instruction(VM *vm);
 //< instructions
 
-Holder *vm_frame_slot(uint8_t index, VM *vm)
+Value *vm_frame_slot(uint8_t index, VM *vm)
 {
     Frame *frame = VM_FRAME_CURRENT(vm);
-
-    return &frame->values[index];
+    return &frame->locals[index];
 }
 
 // private implementation
 static void native_fn_ascii_code(DynArr *args, VM *vm)
 {
-    Holder *str_holder = dynarr_get(0, args);
-    Holder *index_holder = dynarr_get(1, args);
+    Value *str_value = dynarr_get(0, args);
+    Value *index_value = dynarr_get(1, args);
 
-    Value *index_value = NULL;
+    Primitive *index_primitive = NULL;
 
-    if (!vm_is_holder_string(str_holder))
+    if (!vm_is_value_string(str_value))
         vm_err("Failed to execute native function 'char_code'. Expect str as argument 0.");
 
-    if (!vm_is_holder_int(index_holder, &index_value))
+    if (!vm_is_value_int(index_value, &index_primitive))
         vm_err("Failed to execute native function 'char_code'. Expect int as argument 1.");
 
-    String *str = &str_holder->entity.object->value.string;
-    int64_t index = index_value->i64;
+    String *str = &str_value->entity.object->value.string;
+    int64_t index = index_primitive->i64;
 
     if (index < 0 || (size_t)index >= str->length)
         vm_err("Failed to execute native function 'char_code'. Argument 0 constraints: 0 <= index (%d) < str_len (%ld)", index, str->length);
@@ -238,13 +236,13 @@ static void native_fn_ascii_code(DynArr *args, VM *vm)
 
 void native_fn_ascii(DynArr *args, VM *vm)
 {
-    Holder *num_holder = dynarr_get(0, args);
-    Value *num_value = NULL;
+    Value *num_value = dynarr_get(0, args);
+    Primitive *num_primitive = NULL;
 
-    if (!vm_is_holder_int(num_holder, &num_value))
+    if (!vm_is_value_int(num_value, &num_primitive))
         vm_err("Failed to execute native function 'int_to_ascii'. Expect int as argument 0.");
 
-    int64_t num = num_value->i64;
+    int64_t num = num_primitive->i64;
 
     if (num < 0 || num > 127)
         vm_err("Failed to execute native function 'int_to_ascii'. Argument 0 constraints: 0 < num <= 127.");
@@ -266,25 +264,25 @@ void native_fn_ascii(DynArr *args, VM *vm)
 
 void native_fn_str_sub(DynArr *args, VM *vm)
 {
-    Holder *str_holder = dynarr_get(0, args);
-    Holder *from_holder = dynarr_get(1, args);
-    Holder *to_holder = dynarr_get(2, args);
+    Value *str_value = dynarr_get(0, args);
+    Value *from_value = dynarr_get(1, args);
+    Value *to_value = dynarr_get(2, args);
 
-    Value *from_value = NULL;
-    Value *to_value = NULL;
+    Primitive *from_primitive = NULL;
+    Primitive *to_primitive = NULL;
 
-    if (!vm_is_holder_string(str_holder))
+    if (!vm_is_value_string(str_value))
         vm_err("Failed to execute native function 'sub_str'. Expect str as argument 0.");
 
-    if (!vm_is_holder_int(from_holder, &from_value))
+    if (!vm_is_value_int(from_value, &from_primitive))
         vm_err("Failed to execute native function 'sub_str'. Expect int as argument 1.");
 
-    if (!vm_is_holder_int(to_holder, &to_value))
+    if (!vm_is_value_int(to_value, &to_primitive))
         vm_err("Failed to execute native function 'sub_str'. Expect int as argument 2.");
 
-    String *str = &str_holder->entity.object->value.string;
-    int64_t from = from_value->i64;
-    int64_t to = to_value->i64;
+    String *str = &str_value->entity.object->value.string;
+    int64_t from = from_primitive->i64;
+    int64_t to = to_primitive->i64;
 
     if (from < 0 || from > to)
         vm_err("Failed to execute native function 'sub_str'. Argument 1 constraints: 0 <= from (%d) <= to (%d)", from, to);
@@ -310,17 +308,17 @@ void native_fn_str_sub(DynArr *args, VM *vm)
 
 void native_fn_str_lower(DynArr *args, VM *vm)
 {
-    Holder *str_holder = dynarr_get(0, args);
+    Value *str_value = dynarr_get(0, args);
 
-    if (!vm_is_holder_string(str_holder))
+    if (!vm_is_value_string(str_value))
         vm_err("Failed to execute native function 'str_lower'. Expect str as argument 0.");
 
-    String *str = &str_holder->entity.object->value.string;
+    String *str = &str_value->entity.object->value.string;
     size_t str_len = str->length;
 
     if (str_len == 0)
     {
-        vm_stack_push_holder(str_holder, vm);
+        vm_stack_push_value(str_value, vm);
 
         return;
     }
@@ -351,17 +349,17 @@ void native_fn_str_lower(DynArr *args, VM *vm)
 
 void native_fn_str_upper(DynArr *args, VM *vm)
 {
-    Holder *str_holder = dynarr_get(0, args);
+    Value *str_value = dynarr_get(0, args);
 
-    if (!vm_is_holder_string(str_holder))
+    if (!vm_is_value_string(str_value))
         vm_err("Failed to execute native function 'str_lower'. Expect str as argument 0.");
 
-    String *str = &str_holder->entity.object->value.string;
+    String *str = &str_value->entity.object->value.string;
     size_t str_len = str->length;
 
     if (str_len == 0)
     {
-        vm_stack_push_holder(str_holder, vm);
+        vm_stack_push_value(str_value, vm);
 
         return;
     }
@@ -392,17 +390,17 @@ void native_fn_str_upper(DynArr *args, VM *vm)
 
 void native_fn_str_title(DynArr *args, VM *vm)
 {
-    Holder *str_holder = dynarr_get(0, args);
+    Value *str_value = dynarr_get(0, args);
 
-    if (!vm_is_holder_string(str_holder))
+    if (!vm_is_value_string(str_value))
         vm_err("Failed to execute native function 'str_lower'. Expect str as argument 0.");
 
-    String *str = &str_holder->entity.object->value.string;
+    String *str = &str_value->entity.object->value.string;
     size_t str_len = str->length;
 
     if (str_len == 0)
     {
-        vm_stack_push_holder(str_holder, vm);
+        vm_stack_push_value(str_value, vm);
 
         return;
     }
@@ -436,17 +434,17 @@ void native_fn_str_title(DynArr *args, VM *vm)
 
 void native_fn_str_cmp(DynArr *args, VM *vm)
 {
-    Holder *str0_holder = dynarr_get(0, args);
-    Holder *str1_holder = dynarr_get(1, args);
+    Value *str0_value = dynarr_get(0, args);
+    Value *str1_value = dynarr_get(1, args);
 
-    if (!vm_is_holder_string(str0_holder))
+    if (!vm_is_value_string(str0_value))
         vm_err("Failed to execute native function 'cmp_str'. Expect str as argument 0.");
 
-    if (!vm_is_holder_string(str1_holder))
+    if (!vm_is_value_string(str1_value))
         vm_err("Failed to execute native function 'cmp_str'. Expect str as argument 1.");
 
-    String *str0 = &str0_holder->entity.object->value.string;
-    String *str1 = &str1_holder->entity.object->value.string;
+    String *str0 = &str0_value->entity.object->value.string;
+    String *str1 = &str1_value->entity.object->value.string;
 
     uint8_t equals = strcmp(str0->buffer, str1->buffer) == 0;
 
@@ -455,17 +453,17 @@ void native_fn_str_cmp(DynArr *args, VM *vm)
 
 void native_fn_str_cmp_ic(DynArr *args, VM *vm)
 {
-    Holder *str0_holder = dynarr_get(0, args);
-    Holder *str1_holder = dynarr_get(1, args);
+    Value *str0_value = dynarr_get(0, args);
+    Value *str1_value = dynarr_get(1, args);
 
-    if (!vm_is_holder_string(str0_holder))
+    if (!vm_is_value_string(str0_value))
         vm_err("Failed to execute native function 'cmp_ic_str'. Expect str as argument 0.");
 
-    if (!vm_is_holder_string(str1_holder))
+    if (!vm_is_value_string(str1_value))
         vm_err("Failed to execute native function 'cmp_ic_str'. Expect str as argument 1.");
 
-    String *str0 = &str0_holder->entity.object->value.string;
-    String *str1 = &str1_holder->entity.object->value.string;
+    String *str0 = &str0_value->entity.object->value.string;
+    String *str1 = &str1_value->entity.object->value.string;
 
     size_t str0_len = str0->length;
     size_t str1_len = str1->length;
@@ -501,24 +499,24 @@ void native_fn_str_cmp_ic(DynArr *args, VM *vm)
 
 void native_fn_is_str_int(DynArr *args, VM *vm)
 {
-    Holder *str_holder = dynarr_get(0, args);
+    Value *str_value = dynarr_get(0, args);
 
-    if (!vm_is_holder_string(str_holder))
+    if (!vm_is_value_string(str_value))
         vm_err("Failed to execute native function 'is_str_int'. Expect str as argument 0.");
 
-    String *str = &str_holder->entity.object->value.string;
+    String *str = &str_value->entity.object->value.string;
 
     vm_stack_push_bool(is_str_int(str->buffer, str->length), vm);
 }
 
 void native_fn_str_to_int(DynArr *args, VM *vm)
 {
-    Holder *str_holder = dynarr_get(0, args);
+    Value *str_value = dynarr_get(0, args);
 
-    if (!vm_is_holder_string(str_holder))
+    if (!vm_is_value_string(str_value))
         vm_err("Failed to execute native function 'str_to_int'. Argument 0 must be str type.");
 
-    String *str = &str_holder->entity.object->value.string;
+    String *str = &str_value->entity.object->value.string;
 
     char *buffer = str->buffer;
     size_t length = str->length;
@@ -553,13 +551,13 @@ void native_fn_str_to_int(DynArr *args, VM *vm)
 
 void native_fn_int_to_str(DynArr *args, VM *vm)
 {
-    Holder *num_holder = dynarr_get(0, args);
-    Value *num_value = NULL;
+    Value *num_value = dynarr_get(0, args);
+    Primitive *num_primitive = NULL;
 
-    if (!vm_is_holder_int(num_holder, &num_value))
+    if (!vm_is_value_int(num_value, &num_primitive))
         vm_err("Failed to execute native function 'int_to_str'. Expect int as argument 0.");
 
-    int64_t raw_num = num_value->i64;
+    int64_t raw_num = num_primitive->i64;
 
     int is_negative = raw_num < 0;
     int64_t num = is_negative ? raw_num * -1 : raw_num;
@@ -613,14 +611,13 @@ void native_fn_time(DynArr *args, VM *vm)
 
 static void native_fn_sleep(DynArr *args, VM *vm)
 {
-    Holder *sleep_holder = dynarr_get(0, args);
+    Value *sleep_value = dynarr_get(0, args);
+    Primitive *sleep_primitive = NULL;
 
-    Value *sleep_value = NULL;
-
-    if (!vm_is_holder_int(sleep_holder, &sleep_value))
+    if (!vm_is_value_int(sleep_value, &sleep_primitive))
         vm_err("Failed to execute native function 'sleep'. Expect int as argument 0.");
 
-    int64_t value = sleep_value->i64;
+    int64_t value = sleep_primitive->i64;
 
     sleep((unsigned int)value);
 }
@@ -658,32 +655,32 @@ static void native_fn_read_line(DynArr *args, VM *vm)
 
 void native_fn_read_file(DynArr *args, VM *vm)
 {
-    Holder *path_holder = dynarr_get(0, args);
-    Holder *position_holder = dynarr_get(1, args);
-    Holder *size_holder = dynarr_get(2, args);
-    Holder *count_holder = dynarr_get(3, args);
-    Holder *buffer_holder = dynarr_get(4, args);
+    Value *path_value = dynarr_get(0, args);
+    Value *position_value = dynarr_get(1, args);
+    Value *size_value = dynarr_get(2, args);
+    Value *count_value = dynarr_get(3, args);
+    Value *buffer_value = dynarr_get(4, args);
 
-    if (!vm_is_holder_string(path_holder))
+    if (!vm_is_value_string(path_value))
         vm_err("Wrong argument 0. Expect str.");
 
-    if (!vm_is_holder_int(position_holder, NULL))
+    if (!vm_is_value_int(position_value, NULL))
         vm_err("Wrong argument 1. Expect int.");
 
-    if (!vm_is_holder_int(size_holder, NULL))
+    if (!vm_is_value_int(size_value, NULL))
         vm_err("Wrong argument 2. Expect int.");
 
-    if (!vm_is_holder_int(count_holder, NULL))
+    if (!vm_is_value_int(count_value, NULL))
         vm_err("Wrong argument 3. Expect int.");
 
-    if (!vm_is_holder_array(buffer_holder))
+    if (!vm_is_value_array(buffer_value))
         vm_err("Wrong argument 4. Expect array.");
 
-    char *path = path_holder->entity.object->value.string.buffer;
-    int64_t position = position_holder->entity.literal.i64;
-    int64_t size = size_holder->entity.literal.i64;
-    int64_t count = count_holder->entity.literal.i64;
-    Array *arr = &buffer_holder->entity.object->value.array;
+    char *path = path_value->entity.object->value.string.buffer;
+    int64_t position = position_value->entity.primitive.i64;
+    int64_t size = size_value->entity.primitive.i64;
+    int64_t count = count_value->entity.primitive.i64;
+    Array *arr = &buffer_value->entity.object->value.array;
 
     if (position < 0)
         vm_err("wrong argument 1. Constrains: 0 <= position.");
@@ -714,7 +711,7 @@ void native_fn_read_file(DynArr *args, VM *vm)
     while (fread(&container, (size_t)size, 1, file) == 1)
     {
         Object *value_obj = vm_create_object(VALUE_OTYPE, vm);
-        Value *value = &value_obj->value.literal;
+        Primitive *value = &value_obj->value.primitive;
 
         value->type = INT_VTYPE;
         memcpy(&value->i64, container, sizeof(container));
@@ -731,12 +728,12 @@ void native_fn_read_file(DynArr *args, VM *vm)
 
 void native_fn_panic(DynArr *args, VM *vm)
 {
-    Holder *str_holder = dynarr_get(0, args);
+    Value *str_value = dynarr_get(0, args);
 
-    if (!vm_is_holder_string(str_holder))
+    if (!vm_is_value_string(str_value))
         vm_err("Failed to execute native function 'panic'. Expect str as argument 0.");
 
-    String *str = &str_holder->entity.object->value.string;
+    String *str = &str_value->entity.object->value.string;
 
     fprintf(stderr, "PANIC!: ");
     _error_(str->buffer);
@@ -747,14 +744,13 @@ void native_fn_panic(DynArr *args, VM *vm)
 
 static void native_fn_exit(DynArr *args, VM *vm)
 {
-    Holder *code_holder = dynarr_get(0, args);
+    Value *code_value = dynarr_get(0, args);
+    Primitive *code_primitive = NULL;
 
-    Value *code_value = NULL;
-
-    if (!vm_is_holder_int(code_holder, &code_value))
+    if (!vm_is_value_int(code_value, &code_primitive))
         vm_err("Failed to execute native function 'fn_exit'. Expect a int as argument 0.");
 
-    int64_t code = code_value->i64;
+    int64_t code = code_primitive->i64;
 
     vm->stop = 1;
     vm->rtn_code = (int)code;
@@ -840,9 +836,9 @@ void vm_garbage_instance(Object *object)
     while (last_attr_node)
     {
         LZHTableNode *prev_attr_node = last_attr_node->previous_table_node;
-        Holder *attr_holder = (Holder *)last_attr_node->value;
+        Value *attr_value = (Value *)last_attr_node->value;
 
-        vm_memory_dealloc(attr_holder);
+        vm_memory_dealloc(attr_value);
 
         last_attr_node = prev_attr_node;
     }
@@ -880,7 +876,7 @@ void vm_garbage_object(Object *object)
         // futher memory that must be released
         break;
 
-    case OBJ_ARR_OTYPE:
+    case ARR_OTYPE:
         vm_garbage_object_array(object);
         break;
 
@@ -1006,11 +1002,11 @@ int vm_gc_mark_instance(Object *object)
     {
         LZHTableNode *prev_attr_node = attr_node->previous_table_node;
 
-        Holder *attr_holder = (Holder *)attr_node->value;
+        Value *attr_value = (Value *)attr_node->value;
 
-        if (attr_holder->type == OBJECT_HTYPE)
+        if (attr_value->type == OBJECT_HTYPE)
         {
-            Object *attr_obj = attr_holder->entity.object;
+            Object *attr_obj = attr_value->entity.object;
 
             vm_gc_mark_object(attr_obj);
         }
@@ -1038,7 +1034,7 @@ int vm_gc_mark_object(Object *object)
         object->marked = 1;
         return 1;
 
-    case OBJ_ARR_OTYPE:
+    case ARR_OTYPE:
         return vm_gc_mark_object_array(object);
 
     case FN_OTYPE:
@@ -1070,7 +1066,7 @@ int vm_gc_mark_object(Object *object)
     }
 }
 
-int vm_gc_mark_frame_values(Holder *values)
+int vm_gc_mark_frame_values(Value *values)
 {
     size_t count = 0;
 
@@ -1078,12 +1074,12 @@ int vm_gc_mark_frame_values(Holder *values)
 
     for (size_t i = 0; i < values_len; i++)
     {
-        Holder *holder = &values[i];
+        Value *value = &values[i];
 
-        if (holder->type != OBJECT_HTYPE)
+        if (value->type != OBJECT_HTYPE)
             continue;
 
-        count += vm_gc_mark_object(holder->entity.object);
+        count += vm_gc_mark_object(value->entity.object);
     }
 
     return count;
@@ -1101,7 +1097,7 @@ int vm_gc_mark_frames(VM *vm)
         if (instance_obj)
             vm_gc_mark_object(instance_obj);
 
-        count += vm_gc_mark_frame_values(frame->values);
+        count += vm_gc_mark_frame_values(frame->locals);
     }
 
     return count;
@@ -1113,12 +1109,12 @@ int vm_gc_mark_stack(VM *vm)
 
     for (int i = 0; i < vm->stack_ptr; i++)
     {
-        Holder *holder = &vm->stack[i];
+        Value *value = &vm->stack[i];
 
-        if (holder->type != OBJECT_HTYPE)
+        if (value->type != OBJECT_HTYPE)
             continue;
 
-        count += vm_gc_mark_object(holder->entity.object);
+        count += vm_gc_mark_object(value->entity.object);
     }
 
     return count;
@@ -1134,11 +1130,11 @@ int vm_gc_mark_globals(VM *vm)
     {
         LZHTableNode *previous = node->previous_table_node;
 
-        Holder *holder = (Holder *)node->value;
+        Value *value = (Value *)node->value;
 
-        if (holder->type == OBJECT_HTYPE)
+        if (value->type == OBJECT_HTYPE)
         {
-            Object *object = holder->entity.object;
+            Object *object = value->entity.object;
 
             count += vm_gc_mark_object(object);
         }
@@ -1166,137 +1162,137 @@ void vm_gc(VM *vm)
     vm_gc_sweep_objects(vm);
 }
 
-int vm_is_holder_nil(Holder *holder)
+int vm_is_value_nil(Value *value)
 {
-    return holder->type == NIL_HTYPE;
+    return value->type == NIL_HTYPE;
 }
 
-int vm_is_holder_value(Holder *holder, Value **out_value)
+int vm_is_value_primitive(Value *value, Primitive **out_primitive)
 {
-    if (holder->type == NIL_HTYPE)
+    if (value->type == NIL_HTYPE)
         return 0;
 
-    Value *value = NULL;
+    Primitive *primitive = NULL;
 
-    if (holder->type == VALUE_HTYPE)
-        value = &holder->entity.literal;
+    if (value->type == VALUE_HTYPE)
+        primitive = &value->entity.primitive;
     else
     {
-        Object *obj = holder->entity.object;
+        Object *obj = value->entity.object;
 
         if (obj->type == VALUE_OTYPE)
-            value = &obj->value.literal;
+            primitive = &obj->value.primitive;
     }
 
-    if (!value)
+    if (!primitive)
         return 0;
 
-    if (out_value)
-        *out_value = value;
+    if (out_primitive)
+        *out_primitive = primitive;
 
     return 1;
 }
 
-int vm_is_holder_bool(Holder *holder, Value **out_value)
+int vm_is_value_bool(Value *value, Primitive **out_primitive)
 {
-    Value *value = NULL;
+    Primitive *primitive = NULL;
 
-    if (!vm_is_holder_value(holder, &value))
+    if (!vm_is_value_primitive(value, &primitive))
         return 0;
 
-    if (out_value)
-        *out_value = value;
+    if (out_primitive)
+        *out_primitive = primitive;
 
-    return value->type == BOOL_VTYPE;
+    return primitive->type == BOOL_VTYPE;
 }
 
-int vm_is_holder_int(Holder *holder, Value **out_value)
+int vm_is_value_int(Value *value, Primitive **out_primitive)
 {
-    Value *value = NULL;
+    Primitive *primitive = NULL;
 
-    if (!vm_is_holder_value(holder, &value))
+    if (!vm_is_value_primitive(value, &primitive))
         return 0;
 
-    if (out_value)
-        *out_value = value;
+    if (out_primitive)
+        *out_primitive = primitive;
 
-    return value->type == INT_VTYPE;
+    return primitive->type == INT_VTYPE;
 }
 
-int vm_is_holder_string(Holder *holder)
+int vm_is_value_string(Value *value)
 {
-    if (holder->type != OBJECT_HTYPE)
+    if (value->type != OBJECT_HTYPE)
         return 0;
 
-    return holder->entity.object->type == STR_OTYPE;
+    return value->entity.object->type == STR_OTYPE;
 }
 
-int vm_is_holder_obj_value(Holder *holder)
+int vm_is_value_obj_value(Value *value)
 {
-    if (holder->type != OBJECT_HTYPE)
+    if (value->type != OBJECT_HTYPE)
         return 0;
 
-    Object *obj = holder->entity.object;
+    Object *obj = value->entity.object;
 
     return obj->type == VALUE_OTYPE;
 }
 
-int vm_is_holder_array(Holder *holder)
+int vm_is_value_array(Value *value)
 {
-    if (holder->type != OBJECT_HTYPE)
+    if (value->type != OBJECT_HTYPE)
         return 0;
 
-    Object *object = holder->entity.object;
+    Object *object = value->entity.object;
 
-    return object->type == OBJ_ARR_OTYPE;
+    return object->type == ARR_OTYPE;
 }
 
-int vm_is_holder_fn(Holder *holder)
+int vm_is_value_fn(Value *value)
 {
-    if (holder->type != OBJECT_HTYPE)
+    if (value->type != OBJECT_HTYPE)
         return 0;
 
-    return holder->entity.object->type == FN_OTYPE;
+    return value->entity.object->type == FN_OTYPE;
 }
 
-int vm_is_holder_native_fn(Holder *holder)
+int vm_is_value_native_fn(Value *value)
 {
-    if (holder->type != OBJECT_HTYPE)
+    if (value->type != OBJECT_HTYPE)
         return 0;
 
-    return holder->entity.object->type == NATIVE_FN_OTYPE;
+    return value->entity.object->type == NATIVE_FN_OTYPE;
 }
 
-int vm_is_holder_method(Holder *holder)
+int vm_is_value_method(Value *value)
 {
-    if (holder->type != OBJECT_HTYPE)
+    if (value->type != OBJECT_HTYPE)
         return 0;
 
-    return holder->entity.object->type == METHOD_OTYPE;
+    return value->entity.object->type == METHOD_OTYPE;
 }
 
-int vm_is_holder_klass(Holder *holder)
+int vm_is_value_klass(Value *value)
 {
-    if (holder->type != OBJECT_HTYPE)
+    if (value->type != OBJECT_HTYPE)
         return 0;
 
-    return holder->entity.object->type == CLASS_OTYPE;
+    return value->entity.object->type == CLASS_OTYPE;
 }
 
-int vm_is_holder_instance(Holder *holder)
+int vm_is_value_callable(Value *value)
 {
-    if (holder->type != OBJECT_HTYPE)
+    return vm_is_value_fn(value) ||
+           vm_is_value_native_fn(value) ||
+           vm_is_value_method(value) ||
+           vm_is_value_klass(value);
+}
+
+int vm_is_value_instance(Value *value)
+{
+    if (value->type != OBJECT_HTYPE)
         return 0;
 
-    return holder->entity.object->type == INSTANCE_OTYPE;
-}
-
-int vm_is_holder_callable(Holder *holder)
-{
-    return vm_is_holder_fn(holder) ||
-           vm_is_holder_native_fn(holder) ||
-           vm_is_holder_method(holder) ||
-           vm_is_holder_klass(holder);
+    return value->entity.object->type == INSTANCE_OTYPE;
 }
 
 Object *vm_create_method(Object *instance, Fn *function, VM *vm)
@@ -1391,12 +1387,12 @@ void vm_jmp(int32_t jmp_value, int32_t from, VM *vm)
     }
 }
 
-void vm_print_value(Value *value)
+void vm_print_primitive(Primitive *primitive)
 {
-    switch (value->type)
+    switch (primitive->type)
     {
     case BOOL_VTYPE:
-        int64_t bool_value = value->i64;
+        int64_t bool_value = primitive->i64;
 
         if (bool_value)
             printf("true\n");
@@ -1406,7 +1402,7 @@ void vm_print_value(Value *value)
         break;
 
     case INT_VTYPE:
-        printf("%ld\n", value->i64);
+        printf("%ld\n", primitive->i64);
         break;
 
     default:
@@ -1414,15 +1410,15 @@ void vm_print_value(Value *value)
     }
 }
 
-void vm_print_stack_value(Holder *holder)
+void vm_print_stack_value(Value *value)
 {
-    Value *value = &holder->entity.literal;
-    vm_print_value(value);
+    Primitive *primitive = &value->entity.primitive;
+    vm_print_primitive(primitive);
 }
 
-void vm_print_object_value(Holder *holder)
+void vm_print_object_value(Value *value)
 {
-    Object *object = holder->entity.object;
+    Object *object = value->entity.object;
 
     switch (object->type)
     {
@@ -1432,38 +1428,38 @@ void vm_print_object_value(Holder *holder)
         break;
 
     case VALUE_OTYPE:
-        Value *value = &holder->entity.object->value.literal;
-        vm_print_value(value);
+        Primitive *primitive = &value->entity.object->value.primitive;
+        vm_print_primitive(primitive);
         break;
 
-    case OBJ_ARR_OTYPE:
-        Array *oarr = &holder->entity.object->value.array;
-        printf("<object array: %ld> at %p\n", oarr->length, oarr);
+    case ARR_OTYPE:
+        Array *arr = &value->entity.object->value.array;
+        printf("<object array: %ld> at %p\n", arr->length, arr);
         break;
 
     case FN_OTYPE:
-        Fn *fn = holder->entity.object->value.fn;
+        Fn *fn = value->entity.object->value.fn;
         printf("<fn '%s': %ld> at %p\n", fn->name, fn->params->used, fn);
         break;
 
     case NATIVE_FN_OTYPE:
-        NativeFn *native_fn = holder->entity.object->value.native_fn;
+        NativeFn *native_fn = value->entity.object->value.native_fn;
         printf("<native fn '%s' %d>\n", native_fn->name, native_fn->arity);
         break;
 
     case METHOD_OTYPE:
-        Method *method = &holder->entity.object->value.method;
+        Method *method = &value->entity.object->value.method;
         Fn *method_fn = method->fn;
         printf("<fn '%s': %ld> at %p\n", method_fn->name, method_fn->params->used, method_fn);
         break;
 
     case CLASS_OTYPE:
-        Klass *class = holder->entity.object->value.class;
+        Klass *class = value->entity.object->value.class;
         printf("<class '%s'> at %p\n", class->name, class);
         break;
 
     case INSTANCE_OTYPE:
-        Instance *instance = &holder->entity.object->value.instance;
+        Instance *instance = &value->entity.object->value.instance;
         printf("<instance of '%s'> at %p\n", instance->klass->name, instance);
         break;
 
@@ -1472,12 +1468,12 @@ void vm_print_object_value(Holder *holder)
     }
 }
 
-void vm_print_holder(Holder *holder)
+void vm_print_value(Value *value)
 {
-    if (holder->type == VALUE_HTYPE)
-        vm_print_stack_value(holder);
-    else if (holder->type == OBJECT_HTYPE)
-        vm_print_object_value(holder);
+    if (value->type == VALUE_HTYPE)
+        vm_print_stack_value(value);
+    else if (value->type == OBJECT_HTYPE)
+        vm_print_object_value(value);
     else
         printf("NIL\n");
 }
@@ -1526,11 +1522,11 @@ void vm_frame_setup(Frame *frame, Fn *fn, VM *vm)
     size_t args_count = params == NULL ? 0 : params->used;
 
     for (size_t i = 0; i < args_count; i++)
-        memcpy((void *)&frame->values[i], vm_stack_pop(vm), sizeof(Holder));
+        memcpy((void *)&frame->locals[i], vm_stack_pop(vm), sizeof(Value));
 
-    Holder *callable_holder = vm_stack_pop(vm);
+    Value *callable_value = vm_stack_pop(vm);
 
-    if (!vm_is_holder_callable(callable_holder))
+    if (!vm_is_value_callable(callable_value))
         vm_err("Frame setup failed. Expect callable after arguments, but got something else.");
 }
 
@@ -1567,28 +1563,28 @@ void vm_frame_down(VM *vm)
 void vm_frame_read(size_t index, VM *vm)
 {
     Frame *frame = VM_FRAME_CURRENT(vm);
-    Holder *locals = frame->values;
+    Value *locals = frame->locals;
 
     if (index >= FRAME_VALUES_LENGTH)
         vm_err("Failed to get local. Illegal local index: %ld.", index);
 
-    Holder *holder = &locals[index];
+    Value *value = &locals[index];
 
-    vm_stack_push_holder(holder, vm);
+    vm_stack_push_value(value, vm);
 }
 
-void vm_frame_write(int32_t index, Holder *holder, VM *vm)
+void vm_frame_write(int32_t index, Value *value, VM *vm)
 {
     Frame *frame = VM_FRAME_CURRENT(vm);
-    Holder *locals = frame->values;
+    Value *locals = frame->locals;
 
     if (index >= FRAME_VALUES_LENGTH)
         vm_err("Failed to set local. Illegal local index: %ld.", index);
 
-    Holder *local_holder = &locals[index];
+    Value *local_value = &locals[index];
 
-    local_holder->type = holder->type;
-    local_holder->entity = holder->entity;
+    local_value->type = value->type;
+    local_value->entity = value->entity;
 }
 
 uint8_t vm_advance(VM *vm)
@@ -1597,7 +1593,7 @@ uint8_t vm_advance(VM *vm)
     return *(uint8_t *)dynarr_get(frame->ip++, frame->chunks);
 }
 
-Holder *vm_stack_validate_callable(int args_count, VM *vm)
+Value *vm_stack_validate_callable(int args_count, VM *vm)
 {
     if (args_count > VM_STACK_SIZE(vm))
         vm_err("Stack size is %d, but callable arguments count %d", VM_STACK_SIZE(vm), args_count);
@@ -1605,32 +1601,32 @@ Holder *vm_stack_validate_callable(int args_count, VM *vm)
     if (args_count + 1 > VM_STACK_SIZE(vm))
         vm_err("Stack size is %d. Callable arguments count is %d. Can't check callable before arguments.", VM_STACK_SIZE(vm), args_count);
 
-    Holder *callable_holder = &vm->stack[VM_STACK_PTR(vm) - args_count];
+    Value *callable_value = &vm->stack[VM_STACK_PTR(vm) - args_count];
 
-    if (!vm_is_holder_callable(callable_holder))
+    if (!vm_is_value_callable(callable_value))
         vm_err("Expect calalble just before arguments, but got something else.");
 
-    return callable_holder;
+    return callable_value;
 }
 
 DynArr *vm_stack_pop_args(int args_count, VM *vm)
 {
-    Holder *callable_holder = vm_stack_validate_callable(args_count, vm);
-    DynArr *args = vm_memory_create_dynarr(sizeof(Holder));
+    Value *callable_value = vm_stack_validate_callable(args_count, vm);
+    DynArr *args = vm_memory_create_dynarr(sizeof(Value));
 
     for (size_t i = 0; i < (size_t)args_count; i++)
     {
-        Holder *arg = vm_stack_pop(vm);
+        Value *arg = vm_stack_pop(vm);
         dynarr_insert((void *)arg, args);
     }
 
-    if (callable_holder != vm_stack_pop(vm))
+    if (callable_value != vm_stack_pop(vm))
         assert(0 && "Validated callable is not the same at the end of arguments");
 
     return args;
 }
 
-Holder *vm_stack_check_at(int index, VM *vm)
+Value *vm_stack_check_at(int index, VM *vm)
 {
     int stack_ptr = VM_STACK_PTR(vm);
 
@@ -1639,7 +1635,7 @@ Holder *vm_stack_check_at(int index, VM *vm)
     return &vm->stack[index];
 }
 
-Holder *vm_stack_peek(int distance, VM *vm)
+Value *vm_stack_peek(int distance, VM *vm)
 {
     assert(distance >= 0 && "'distance' must be > 0");
 
@@ -1669,79 +1665,79 @@ void vm_stack_set_obj(int count, Object *obj, VM *vm)
     if (mov_count > remain)
         vm_err("Failed to set obj in stack. Need to move %d, but remian %d.", mov_count, remain);
 
-    Holder *stack = vm->stack;
+    Value *stack = vm->stack;
 
-    memmove(stack + at + 1, stack + at, sizeof(Holder) * mov_count);
+    memmove(stack + at + 1, stack + at, sizeof(Value) * mov_count);
 
-    Holder *at_holder = &stack[at];
+    Value *at_value = &stack[at];
 
-    at_holder->type = OBJECT_HTYPE;
-    at_holder->entity.object = obj;
+    at_value->type = OBJECT_HTYPE;
+    at_value->entity.object = obj;
 
     vm->stack_ptr++;
 }
 
-void vm_stack_push_bool(uint8_t value, VM *vm)
-{
-    vm_stack_check_overflow(vm);
-
-    Holder *holder = &vm->stack[vm->stack_ptr++];
-
-    holder->type = VALUE_HTYPE;
-    holder->entity.literal.type = BOOL_VTYPE;
-    holder->entity.literal.i64 = value;
-}
-
-void vm_stack_push_int(int64_t value, VM *vm)
-{
-    vm_stack_check_overflow(vm);
-
-    Holder *holder = &vm->stack[vm->stack_ptr++];
-
-    holder->type = VALUE_HTYPE;
-    holder->entity.literal.type = INT_VTYPE;
-    holder->entity.literal.i64 = value;
-}
-
 void vm_stack_push_nil(VM *vm)
 {
-    Holder *holder = &vm->stack[vm->stack_ptr++];
+    Value *value = &vm->stack[vm->stack_ptr++];
 
-    memset((void *)holder, 0, sizeof(Holder));
+    memset((void *)value, 0, sizeof(Value));
 
-    holder->type = NIL_HTYPE;
+    value->type = NIL_HTYPE;
+}
+
+void vm_stack_push_bool(uint8_t primitive, VM *vm)
+{
+    vm_stack_check_overflow(vm);
+
+    Value *value = &vm->stack[vm->stack_ptr++];
+
+    value->type = VALUE_HTYPE;
+    value->entity.primitive.type = BOOL_VTYPE;
+    value->entity.primitive.i64 = primitive;
+}
+
+void vm_stack_push_int(int64_t primitive, VM *vm)
+{
+    vm_stack_check_overflow(vm);
+
+    Value *value = &vm->stack[vm->stack_ptr++];
+
+    value->type = VALUE_HTYPE;
+    value->entity.primitive.type = INT_VTYPE;
+    value->entity.primitive.i64 = primitive;
 }
 
 void vm_stack_push_object(Object *object, VM *vm)
 {
     vm_stack_check_overflow(vm);
 
-    Holder *holder = &vm->stack[vm->stack_ptr++];
+    Value *value = &vm->stack[vm->stack_ptr++];
 
-    holder->type = OBJECT_HTYPE;
-    holder->entity.object = object;
+    value->type = OBJECT_HTYPE;
+    value->entity.object = object;
 }
 
-void vm_stack_push_holder(Holder *holder, VM *vm)
+void vm_stack_push_value(Value *value, VM *vm)
 {
     vm_stack_check_overflow(vm);
 
-    if (holder->type == VALUE_HTYPE)
+    if (value->type == VALUE_HTYPE)
     {
-        Value *vholder = &holder->entity.literal;
+        Primitive *primitive = &value->entity.primitive;
 
-        if (vholder->type == BOOL_VTYPE)
-            vm_stack_push_bool(vholder->i64, vm);
-        else if (vholder->type == INT_VTYPE)
-            vm_stack_push_int(vholder->i64, vm);
+        if (primitive->type == BOOL_VTYPE)
+            vm_stack_push_bool(primitive->i64, vm);
+        else if (primitive->type == INT_VTYPE)
+            vm_stack_push_int(primitive->i64, vm);
     }
-    else if (holder->type == OBJECT_HTYPE)
-        vm_stack_push_object(holder->entity.object, vm);
+    else if (value->type == OBJECT_HTYPE)
+        vm_stack_push_object(value->entity.object, vm);
     else
         vm_stack_push_nil(vm);
 }
 
-Holder *vm_stack_pop(VM *vm)
+Value *vm_stack_pop(VM *vm)
 {
     if (VM_STACK_PTR(vm) == -1)
         vm_err("StackUnderFlowError");
@@ -1749,28 +1745,28 @@ Holder *vm_stack_pop(VM *vm)
     return &vm->stack[--vm->stack_ptr];
 }
 
-void vm_globals_write(char *identifier, Holder *holder, VM *vm)
+void vm_globals_write(char *identifier, Value *value, VM *vm)
 {
-    Holder *global_holder = (Holder *)lzhtable_get((uint8_t *)identifier, strlen(identifier), vm->globals);
+    Value *global_value = (Value *)lzhtable_get((uint8_t *)identifier, strlen(identifier), vm->globals);
 
-    if (!global_holder)
+    if (!global_value)
     {
-        global_holder = vm_memory_alloc(sizeof(Holder));
-        lzhtable_put((uint8_t *)identifier, strlen(identifier), (void *)global_holder, vm->globals, NULL);
+        global_value = vm_memory_alloc(sizeof(Value));
+        lzhtable_put((uint8_t *)identifier, strlen(identifier), (void *)global_value, vm->globals, NULL);
     }
 
-    global_holder->type = holder->type;
-    global_holder->entity = holder->entity;
+    global_value->type = value->type;
+    global_value->entity = value->entity;
 }
 
-Holder *vm_globals_read(char *identifier, VM *vm)
+Value *vm_globals_read(char *identifier, VM *vm)
 {
-    void *raw_holder = lzhtable_get((uint8_t *)identifier, strlen(identifier), vm->globals);
+    void *raw_value = lzhtable_get((uint8_t *)identifier, strlen(identifier), vm->globals);
 
-    if (!raw_holder)
+    if (!raw_value)
         vm_err("Failed to get global: '%s' do not exists.", identifier);
 
-    return (Holder *)raw_holder;
+    return (Value *)raw_value;
 }
 
 void vm_execute_nil(VM *vm)
@@ -1801,22 +1797,22 @@ void vm_execute_string(VM *vm)
     vm_stack_push_object(str_obj, vm);
 }
 
-void vm_execute_object_array(VM *vm)
+void vm_execute_array(VM *vm)
 {
-    Holder *len_holder = vm_stack_pop(vm);
-    Value *len_value = NULL;
+    Value *len_value = vm_stack_pop(vm);
+    Primitive *len_primitive = NULL;
 
-    if (!vm_is_holder_int(len_holder, &len_value))
+    if (!vm_is_value_int(len_value, &len_primitive))
         vm_err("Failed to create object array. Expect int as length, but got something else.");
 
-    int32_t len = (int32_t)len_value->i64;
+    int32_t len = (int32_t)len_primitive->i64;
 
     if (len < 0 || len > INT32_MAX)
         vm_err("Failed to create object array. Constraints: 0 < length (%d) <= %d.", len, INT32_MAX);
 
     uint8_t is_empty = vm_advance(vm);
 
-    Object *arr_obj = vm_create_object(OBJ_ARR_OTYPE, vm);
+    Object *arr_obj = vm_create_object(ARR_OTYPE, vm);
     Array *arr = &arr_obj->value.array;
 
     if (len == 0)
@@ -1834,22 +1830,22 @@ void vm_execute_object_array(VM *vm)
     {
         for (int32_t i = len - 1; i >= 0; i--)
         {
-            Holder *holder = vm_stack_pop(vm);
+            Value *value = vm_stack_pop(vm);
 
-            if (holder->type == VALUE_HTYPE)
+            if (value->type == VALUE_HTYPE)
             {
-                Object *value_obj = vm_create_object(VALUE_OTYPE, vm);
-                Value *value = &value_obj->value.literal;
+                Object *obj = vm_create_object(VALUE_OTYPE, vm);
+                Primitive *primitive = &obj->value.primitive;
 
-                value->type = holder->entity.literal.type;
-                value->i64 = holder->entity.literal.i64;
+                primitive->type = value->entity.primitive.type;
+                primitive->i64 = value->entity.primitive.i64;
 
-                arr->items[i] = value_obj;
+                arr->items[i] = obj;
 
                 continue;
             }
 
-            Object *obj = holder->entity.object;
+            Object *obj = value->entity.object;
             arr->items[i] = obj;
         }
     }
@@ -1859,14 +1855,14 @@ void vm_execute_object_array(VM *vm)
 
 void vm_execute_array_length(VM *vm)
 {
-    Holder *holder = vm_stack_pop(vm);
+    Value *value = vm_stack_pop(vm);
 
-    if (holder->type != OBJECT_HTYPE)
+    if (value->type != OBJECT_HTYPE)
         vm_err("Failed to get array length: illegal type.");
 
-    Object *object = holder->entity.object;
+    Object *object = value->entity.object;
 
-    if (object->type != OBJ_ARR_OTYPE)
+    if (object->type != ARR_OTYPE)
         vm_err("Failed to get array length: illegal type.");
 
     vm_stack_push_int((int64_t)object->value.array.length, vm);
@@ -1874,19 +1870,19 @@ void vm_execute_array_length(VM *vm)
 
 void vm_execute_get_array_item(VM *vm)
 {
-    Holder *index_holder = vm_stack_pop(vm);
+    Value *index_value = vm_stack_pop(vm);
 
-    if (!vm_is_holder_int(index_holder, NULL))
+    if (!vm_is_value_int(index_value, NULL))
         vm_err("Failed to get array item: expect index, but got something else.");
 
-    Holder *arr_holder = vm_stack_pop(vm);
+    Value *arr_value = vm_stack_pop(vm);
 
-    if (!vm_is_holder_array(arr_holder))
+    if (!vm_is_value_array(arr_value))
         vm_err("Failed to get array item: expect array but got something else.");
 
-    int64_t index = (int64_t)index_holder->entity.literal.i64;
+    int64_t index = (int64_t)index_value->entity.primitive.i64;
 
-    Object *arr_obj = arr_holder->entity.object;
+    Object *arr_obj = arr_value->entity.object;
     Array *arr = &arr_obj->value.array;
 
     if (index < 0 || (size_t)index >= arr->length)
@@ -1902,37 +1898,37 @@ void vm_execute_get_array_item(VM *vm)
 
 void vm_execute_set_array_item(VM *vm)
 {
-    Holder *index_holder = vm_stack_pop(vm);
-    Holder *array_holder = vm_stack_pop(vm);
-    Holder *value_holder = vm_stack_peek(0, vm);
+    Value *index_value = vm_stack_pop(vm);
+    Value *array_value = vm_stack_pop(vm);
+    Value *value_value = vm_stack_peek(0, vm);
 
-    Value *index_valuer = NULL;
+    Primitive *index_primitive = NULL;
 
-    if (!vm_is_holder_int(index_holder, &index_valuer))
+    if (!vm_is_value_int(index_value, &index_primitive))
         vm_err("Failed to assign value to array. Expect a int as index, but got something else.");
 
-    int32_t index = (int32_t)index_valuer->i64;
+    int32_t index = (int32_t)index_primitive->i64;
 
-    if (!vm_is_holder_array(array_holder))
+    if (!vm_is_value_array(array_value))
         vm_err("Failed to assign value to array. Expect a arra, but got something else.");
 
-    Array *array_obj = &array_holder->entity.object->value.array;
+    Array *array_obj = &array_value->entity.object->value.array;
 
     if (index < 0 || (size_t)index >= array_obj->length)
         vm_err("Failed to assign value to array. Constraints: 0 < index (%d) < arr_len (%ld).", index, array_obj->length);
 
-    if (value_holder->type == NIL_HTYPE)
+    if (value_value->type == NIL_HTYPE)
     {
         array_obj->items[index] = NULL;
         return;
     }
 
-    Value *raw_rvalue = NULL;
+    Primitive *raw_rvalue = NULL;
 
-    if (vm_is_holder_value(value_holder, &raw_rvalue))
+    if (vm_is_value_primitive(value_value, &raw_rvalue))
     {
         Object *value_obj = vm_create_object(VALUE_OTYPE, vm);
-        Value *raw_lvalue = &value_obj->value.literal;
+        Primitive *raw_lvalue = &value_obj->value.primitive;
 
         raw_lvalue->type = raw_rvalue->type;
         raw_lvalue->i64 = raw_rvalue->i64;
@@ -1942,21 +1938,21 @@ void vm_execute_set_array_item(VM *vm)
         return;
     }
 
-    array_obj->items[index] = value_holder->entity.object;
+    array_obj->items[index] = value_value->entity.object;
 }
 
 void vm_execute_arithmetic(int type, VM *vm)
 {
-    Holder *right = vm_stack_pop(vm);
-    Holder *left = vm_stack_pop(vm);
+    Value *right = vm_stack_pop(vm);
+    Value *left = vm_stack_pop(vm);
 
-    Value *lvalue = NULL;
-    Value *rvalue = NULL;
+    Primitive *lvalue = NULL;
+    Primitive *rvalue = NULL;
 
-    if (!vm_is_holder_int(left, &lvalue))
+    if (!vm_is_value_int(left, &lvalue))
         vm_err("Failed to execute arithmetic. Left is not int type.");
 
-    if (!vm_is_holder_int(right, &rvalue))
+    if (!vm_is_value_int(right, &rvalue))
         vm_err("Failed to execute arithmetic. Right is not int type.");
 
     switch (type)
@@ -2001,16 +1997,16 @@ void vm_execute_arithmetic(int type, VM *vm)
 
 void vm_execute_comparison(int type, VM *vm)
 {
-    Holder *right = vm_stack_pop(vm);
-    Holder *left = vm_stack_pop(vm);
+    Value *right = vm_stack_pop(vm);
+    Value *left = vm_stack_pop(vm);
 
-    Value *lvalue = NULL;
-    Value *rvalue = NULL;
+    Primitive *lvalue = NULL;
+    Primitive *rvalue = NULL;
 
-    if (!vm_is_holder_int(left, &lvalue))
+    if (!vm_is_value_int(left, &lvalue))
         vm_err("Failed to execute comparison. Left is not int type.");
 
-    if (!vm_is_holder_int(right, &rvalue))
+    if (!vm_is_value_int(right, &rvalue))
         vm_err("Failed to execute comparison. Right is not int type.");
 
     switch (type)
@@ -2052,13 +2048,13 @@ void vm_execute_comparison(int type, VM *vm)
 
 void vm_execute_argjmp(int type, VM *vm)
 {
-    Holder *holder = vm_stack_pop(vm);
-    Value *raw_value = NULL;
+    Value *value = vm_stack_pop(vm);
+    Primitive *primitive = NULL;
 
-    if (!vm_is_holder_bool(holder, &raw_value))
+    if (!vm_is_value_bool(value, &primitive))
         vm_err("Failed to execute conditional jump. Expect a bool popped from stack.");
 
-    int64_t value = raw_value->i64;
+    int64_t flag = primitive->i64;
 
     int jmp_value = vm_read_i32(vm);
 
@@ -2066,13 +2062,13 @@ void vm_execute_argjmp(int type, VM *vm)
     {
         // jump if true
     case 1:
-        if (value == 1)
+        if (flag == 1)
             vm_jmp(jmp_value, VM_FRAME_CURRENT(vm)->ip - 5, vm);
         break;
 
         // jump if false
     case 2:
-        if (value == 0)
+        if (flag == 0)
             vm_jmp(jmp_value, VM_FRAME_CURRENT(vm)->ip, vm);
         break;
 
@@ -2083,16 +2079,16 @@ void vm_execute_argjmp(int type, VM *vm)
 
 void vm_execute_logical(int type, VM *vm)
 {
-    Holder *right = vm_stack_pop(vm);
-    Holder *left = vm_stack_pop(vm);
+    Value *right = vm_stack_pop(vm);
+    Value *left = vm_stack_pop(vm);
 
-    Value *lvalue = NULL;
-    Value *rvalue = NULL;
+    Primitive *lvalue = NULL;
+    Primitive *rvalue = NULL;
 
-    if (!vm_is_holder_bool(left, &lvalue))
+    if (!vm_is_value_bool(left, &lvalue))
         vm_err("Failed to execute logical. Left is not value.");
 
-    if (!vm_is_holder_bool(right, &rvalue))
+    if (!vm_is_value_bool(right, &rvalue))
         vm_err("Failed to execute logical. Right is not value.");
 
     switch (type)
@@ -2112,13 +2108,13 @@ void vm_execute_logical(int type, VM *vm)
 
 void vm_execute_negation(int type, VM *vm)
 {
-    Holder *right = vm_stack_pop(vm);
-    Value *value = NULL;
+    Value *right = vm_stack_pop(vm);
+    Primitive *value = NULL;
 
     switch (type)
     {
     case 1:
-        if (!vm_is_holder_bool(right, &value))
+        if (!vm_is_value_bool(right, &value))
             vm_err("Failed to execute negation. Right is not bool.");
 
         vm_stack_push_bool(!value->i64, vm);
@@ -2126,7 +2122,7 @@ void vm_execute_negation(int type, VM *vm)
         break;
 
     case 2:
-        if (!vm_is_holder_int(right, &value))
+        if (!vm_is_value_int(right, &value))
             vm_err("Failed to execute negation. Right is not bool.");
 
         vm_stack_push_int(-value->i64, vm);
@@ -2140,20 +2136,20 @@ void vm_execute_negation(int type, VM *vm)
 
 void vm_execute_shift(int type, VM *vm)
 {
-    Holder *right_holder = vm_stack_pop(vm);
-    Holder *left_holder = vm_stack_pop(vm);
+    Value *right_value = vm_stack_pop(vm);
+    Value *left_value = vm_stack_pop(vm);
 
-    Value *left_value = NULL;
-    Value *right_value = NULL;
+    Primitive *left_primitive = NULL;
+    Primitive *right_primitive = NULL;
 
-    if (!vm_is_holder_int(left_holder, &left_value))
+    if (!vm_is_value_int(left_value, &left_primitive))
         vm_err("Failed to execute shift. Expect int at left side, but got something else.");
 
-    if (!vm_is_holder_int(right_holder, &right_value))
+    if (!vm_is_value_int(right_value, &right_primitive))
         vm_err("Failed to execute shift. Expect int at right side, but got something else.");
 
-    int64_t left = left_value->i64;
-    int64_t right = right_value->i64;
+    int64_t left = left_primitive->i64;
+    int64_t right = right_primitive->i64;
 
     switch (type)
     {
@@ -2174,20 +2170,20 @@ void vm_execute_bitwise(int type, VM *vm)
 {
     if (type >= 1 && type <= 3)
     {
-        Holder *right_holder = vm_stack_pop(vm);
-        Holder *left_holder = vm_stack_pop(vm);
+        Value *right_value = vm_stack_pop(vm);
+        Value *left_value = vm_stack_pop(vm);
 
-        Value *left_value = NULL;
-        Value *right_value = NULL;
+        Primitive *left_primitive = NULL;
+        Primitive *right_primitive = NULL;
 
-        if (!vm_is_holder_int(left_holder, &left_value))
+        if (!vm_is_value_int(left_value, &left_primitive))
             vm_err("Failed to execute bitwise. Expect int at left side, but got something else.");
 
-        if (!vm_is_holder_int(right_holder, &right_value))
+        if (!vm_is_value_int(right_value, &right_primitive))
             vm_err("Failed to execute bitwise. Expect int at right side, but got something else.");
 
-        int64_t left = left_value->i64;
-        int64_t right = right_value->i64;
+        int64_t left = left_primitive->i64;
+        int64_t right = right_primitive->i64;
 
         switch (type)
         {
@@ -2213,13 +2209,13 @@ void vm_execute_bitwise(int type, VM *vm)
     }
     else if (type == 4)
     {
-        Holder *right_holder = vm_stack_pop(vm);
-        Value *right_value = NULL;
+        Value *right_value = vm_stack_pop(vm);
+        Primitive *right_primitive = NULL;
 
-        if (!vm_is_holder_int(right_holder, &right_value))
+        if (!vm_is_value_int(right_value, &right_primitive))
             vm_err("Failed to execute bitwise. Expect int at right side, but got something else.");
 
-        int64_t right = right_value->i64;
+        int64_t right = right_primitive->i64;
 
         vm_stack_push_int(~right, vm);
     }
@@ -2229,13 +2225,13 @@ void vm_execute_bitwise(int type, VM *vm)
 
 void vm_execute_concat(VM *vm)
 {
-    Holder *right = vm_stack_pop(vm);
-    Holder *left = vm_stack_pop(vm);
+    Value *right = vm_stack_pop(vm);
+    Value *left = vm_stack_pop(vm);
 
-    if (!vm_is_holder_string(left))
+    if (!vm_is_value_string(left))
         vm_err("Failed to concat string. Left is not string type.");
 
-    if (!vm_is_holder_string(right))
+    if (!vm_is_value_string(right))
         vm_err("Failed to concat string. Right is not string type.");
 
     String *lstr = &left->entity.object->value.string;
@@ -2260,30 +2256,30 @@ void vm_execute_concat(VM *vm)
 
 void vm_execute_length_str(VM *vm)
 {
-    Holder *str_holder = vm_stack_pop(vm);
+    Value *str_value = vm_stack_pop(vm);
 
-    if (!vm_is_holder_string(str_holder))
+    if (!vm_is_value_string(str_value))
         vm_err("Failed to get str length. Illegal type.");
 
-    String *str = &str_holder->entity.object->value.string;
+    String *str = &str_value->entity.object->value.string;
 
     vm_stack_push_int((int64_t)str->length, vm);
 }
 
 void vm_execute_str_itm(VM *vm)
 {
-    Holder *str_holder = vm_stack_pop(vm);
-    Holder *index_holder = vm_stack_pop(vm);
-    Value *index_value = NULL;
+    Value *str_value = vm_stack_pop(vm);
+    Value *index_value = vm_stack_pop(vm);
+    Primitive *index_primitive = NULL;
 
-    if (!vm_is_holder_string(str_holder))
+    if (!vm_is_value_string(str_value))
         vm_err("Failed to get str character. Expect str, but got something else.");
 
-    if (!vm_is_holder_int(index_holder, &index_value))
+    if (!vm_is_value_int(index_value, &index_primitive))
         vm_err("Failed to get str character. Illegal index type.");
 
-    int64_t index = index_value->i64;
-    String *str = &str_holder->entity.object->value.string;
+    int64_t index = index_primitive->i64;
+    String *str = &str_value->entity.object->value.string;
 
     if (index < 0 || (size_t)index >= str->length)
         vm_err("Failed to get str character. Constraints: 0 < index (%d) < str_len (%ld).", index, str->length);
@@ -2322,19 +2318,19 @@ void vm_execute_get_property(VM *vm)
 {
     char *key = vm_read_string(vm);
     size_t key_size = strlen(key);
-    Holder *instance_holder = vm_stack_pop(vm);
+    Value *instance_value = vm_stack_pop(vm);
 
-    if (!vm_is_holder_instance(instance_holder))
+    if (!vm_is_value_instance(instance_value))
         vm_err("Failed to access member of instance. Expect an instance, but got something else.");
 
-    Object *instance_obj = instance_holder->entity.object;
+    Object *instance_obj = instance_value->entity.object;
     Instance *instance = instance = &instance_obj->value.instance;
 
-    Holder *member = (Holder *)lzhtable_get((uint8_t *)key, key_size, instance->attributes);
+    Value *member = (Value *)lzhtable_get((uint8_t *)key, key_size, instance->attributes);
 
     if (member)
     {
-        vm_stack_push_holder((Holder *)member, vm);
+        vm_stack_push_value((Value *)member, vm);
         return;
     }
 
@@ -2353,67 +2349,66 @@ void vm_execute_set_property(VM *vm)
     char *key = vm_read_string(vm);
     size_t key_size = strlen(key);
 
-    Holder *instance_holder = vm_stack_pop(vm);
-    Holder *value_holder = vm_stack_peek(0, vm);
+    Value *instance_value = vm_stack_pop(vm);
+    Value *input_value = vm_stack_peek(0, vm);
 
-    if (!vm_is_holder_instance(instance_holder))
+    if (!vm_is_value_instance(instance_value))
         vm_err("Failed to access member of instance. Expect an instance, but got something else.");
 
-    Object *instance_obj = instance_holder->entity.object;
+    Object *instance_obj = instance_value->entity.object;
     Instance *instance = instance = &instance_obj->value.instance;
+    Value *value = lzhtable_get((uint8_t *)key, key_size, instance->attributes);
 
-    Holder *holder = lzhtable_get((uint8_t *)key, key_size, instance->attributes);
+    if (!value)
+        value = (Value *)vm_memory_calloc(sizeof(Value));
 
-    if (!holder)
-        holder = (Holder *)vm_memory_calloc(sizeof(Holder));
+    memcpy(value, input_value, sizeof(Value));
 
-    memcpy(holder, value_holder, sizeof(Holder));
-
-    lzhtable_put((uint8_t *)key, key_size, holder, instance->attributes, NULL);
+    lzhtable_put((uint8_t *)key, key_size, value, instance->attributes, NULL);
 }
 
 void vm_execute_is(VM *vm)
 {
-    Holder *obj_holder = vm_stack_pop(vm);
+    Value *obj_value = vm_stack_pop(vm);
     int8_t type = vm_advance(vm);
 
     switch (type)
     {
     case 0: // nil
-        vm_stack_push_bool(vm_is_holder_nil(obj_holder), vm);
+        vm_stack_push_bool(vm_is_value_nil(obj_value), vm);
         break;
 
     case 1: // bool
-        vm_stack_push_bool(vm_is_holder_bool(obj_holder, NULL), vm);
+        vm_stack_push_bool(vm_is_value_bool(obj_value, NULL), vm);
         break;
 
     case 2: // int
-        vm_stack_push_bool(vm_is_holder_int(obj_holder, NULL), vm);
+        vm_stack_push_bool(vm_is_value_int(obj_value, NULL), vm);
         break;
 
     case 3: // str
-        vm_stack_push_bool(vm_is_holder_string(obj_holder), vm);
+        vm_stack_push_bool(vm_is_value_string(obj_value), vm);
         break;
 
     case 4: // arr
-        vm_stack_push_bool(vm_is_holder_array(obj_holder), vm);
+        vm_stack_push_bool(vm_is_value_array(obj_value), vm);
         break;
 
     case 5: // function
-        int is_fn = vm_is_holder_fn(obj_holder) ||
-                    vm_is_holder_native_fn(obj_holder) ||
-                    vm_is_holder_method(obj_holder);
+        int is_fn = vm_is_value_fn(obj_value) ||
+                    vm_is_value_native_fn(obj_value) ||
+                    vm_is_value_method(obj_value);
 
         vm_stack_push_bool(is_fn, vm);
 
         break;
 
     case 6: // klass
-        vm_stack_push_bool(vm_is_holder_klass(obj_holder), vm);
+        vm_stack_push_bool(vm_is_value_klass(obj_value), vm);
         break;
 
     case 7: // instance
-        vm_stack_push_bool(vm_is_holder_instance(obj_holder), vm);
+        vm_stack_push_bool(vm_is_value_instance(obj_value), vm);
         break;
 
     default:
@@ -2423,17 +2418,17 @@ void vm_execute_is(VM *vm)
 
 void vm_execute_from(VM *vm)
 {
-    Holder *holder = vm_stack_pop(vm);
+    Value *value = vm_stack_pop(vm);
     char *klass_name = vm_read_string(vm);
 
-    if (!vm_is_holder_instance(holder))
+    if (!vm_is_value_instance(value))
     {
         vm_stack_push_bool(0, vm);
 
         return;
     }
 
-    Instance *instance = &holder->entity.object->value.instance;
+    Instance *instance = &value->entity.object->value.instance;
     Klass *klass = instance->klass;
 
     vm_stack_push_bool((uint8_t)strcmp(klass->name, klass_name) == 0, vm);
@@ -2478,9 +2473,9 @@ void vm_execute_jmp(VM *vm)
 
 void vm_execute_jmpc(VM *vm)
 {
-    Holder *holder = vm_stack_pop(vm);
+    Value *value = vm_stack_pop(vm);
 
-    if (!vm_is_holder_bool(holder, NULL))
+    if (!vm_is_value_bool(value, NULL))
         vm_err("Filed to execute jmpc: expect a bool.");
 
     int32_t jmpc_value = vm_read_i32(vm);
@@ -2494,7 +2489,7 @@ void vm_execute_jmpc(VM *vm)
     if (current_ip + jmpc_value > frame->chunks->used)
         vm_err("Failed to execute jmpc: illegal jmpc value %d (%d): added to ip exceeds the number of chunks %d.", jmpc_value, current_ip + jmpc_value, frame->chunks->used);
 
-    if (!holder->entity.literal.i64)
+    if (!value->entity.primitive.i64)
         frame->ip = current_ip + jmpc_value;
 }
 
@@ -2507,25 +2502,25 @@ void vm_execute_get_local(VM *vm)
 void vm_execute_set_local(VM *vm)
 {
     int32_t index = (int32_t)vm_advance(vm);
-    Holder *holder = vm_stack_peek(0, vm);
+    Value *value = vm_stack_peek(0, vm);
 
-    vm_frame_write(index, holder, vm);
+    vm_frame_write(index, value, vm);
 }
 
 void vm_execute_set_global(VM *vm)
 {
     char *identifier = vm_read_string(vm);
-    Holder *holder = vm_stack_peek(0, vm);
+    Value *value = vm_stack_peek(0, vm);
 
-    vm_globals_write(identifier, holder, vm);
+    vm_globals_write(identifier, value, vm);
 }
 
 void vm_execute_get_global(VM *vm)
 {
     char *identifier = vm_read_string(vm);
-    Holder *holder = (Holder *)vm_globals_read(identifier, vm);
+    Value *value = (Value *)vm_globals_read(identifier, vm);
 
-    vm_stack_push_holder(holder, vm);
+    vm_stack_push_value(value, vm);
 }
 
 void vm_execute_load_entity(VM *vm)
@@ -2571,8 +2566,8 @@ void vm_execute_load_entity(VM *vm)
 
 void vm_execute_print(VM *vm)
 {
-    Holder *holder = vm_stack_pop(vm);
-    vm_print_holder(holder);
+    Value *value = vm_stack_pop(vm);
+    vm_print_value(value);
 }
 
 void vm_execute_pop(VM *vm)
@@ -2584,8 +2579,8 @@ void vm_execute_call(VM *vm)
 {
     uint8_t args_count = vm_advance(vm);
 
-    Holder *callable_holder = vm_stack_validate_callable(args_count, vm);
-    Object *callable_obj = callable_holder->entity.object;
+    Value *callable_value = vm_stack_validate_callable(args_count, vm);
+    Object *callable_obj = callable_value->entity.object;
 
     int setup = 0;
 
@@ -2593,12 +2588,12 @@ void vm_execute_call(VM *vm)
     Object *frame_instance = NULL;
     int is_constructor = 0;
 
-    if (vm_is_holder_fn(callable_holder))
+    if (vm_is_value_fn(callable_value))
     {
         setup = 1;
         callable = callable_obj->value.fn;
     }
-    else if (vm_is_holder_native_fn(callable_holder))
+    else if (vm_is_value_native_fn(callable_value))
     {
         NativeFn *native_fn = callable_obj->value.native_fn;
 
@@ -2613,7 +2608,7 @@ void vm_execute_call(VM *vm)
 
         return;
     }
-    else if (vm_is_holder_method(callable_holder))
+    else if (vm_is_value_method(callable_value))
     {
         Method *method = &callable_obj->value.method;
 
@@ -2622,7 +2617,7 @@ void vm_execute_call(VM *vm)
 
         setup = 1;
     }
-    else if (vm_is_holder_klass(callable_holder))
+    else if (vm_is_value_klass(callable_value))
     {
         Klass *klass = callable_obj->value.class;
         Fn *constructor = klass->constructor;
@@ -2709,7 +2704,7 @@ void vm_execute_instruction(VM *vm)
 
     case ARR_OPC:
         vm_validate_opcode("OARR", 1, vm);
-        vm_execute_object_array(vm);
+        vm_execute_array(vm);
         break;
 
     case ARR_LEN_OPC:
@@ -2967,7 +2962,7 @@ VM *vm_create()
     vm->rtn_code = 0;
 
     vm->stack_ptr = 0;
-    memset(vm->stack, 0, sizeof(Holder) * VM_STACK_LENGTH);
+    memset(vm->stack, 0, sizeof(Value) * VM_STACK_LENGTH);
 
     vm->frame_ptr = 0;
     memset(vm->frames, 0, sizeof(Frame) * VM_FRAME_LENGTH);
@@ -3078,8 +3073,8 @@ void vm_destroy(VM *vm)
     {
         LZHTableNode *previous = node->previous_table_node;
 
-        Holder *holder = (Holder *)node->value;
-        vm_memory_dealloc(holder);
+        Value *value = (Value *)node->value;
+        vm_memory_dealloc(value);
 
         node = previous;
     }
@@ -3134,10 +3129,10 @@ void vm_print_stack(VM *vm)
 
     for (int i = 0; i < VM_STACK_SIZE(vm); i++)
     {
-        Holder *holder = &vm->stack[i];
+        Value *value = &vm->stack[i];
 
         printf("%d: ", i + 1);
-        vm_print_holder(holder);
+        vm_print_value(value);
     }
 }
 

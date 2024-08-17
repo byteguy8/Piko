@@ -1,7 +1,7 @@
 #ifndef _OBJECT_H_
 #define _OBJECT_H_
 
-#include "value.h"
+#include "primitive.h"
 #include "function.h"
 #include "klass.h"
 
@@ -12,7 +12,7 @@ typedef enum _object_type_
 {
     VALUE_OTYPE,
     STR_OTYPE,
-    OBJ_ARR_OTYPE,
+    ARR_OTYPE,
     FN_OTYPE,
     NATIVE_FN_OTYPE,
     METHOD_OTYPE,
@@ -60,7 +60,7 @@ typedef struct _object_
 
     union
     {
-        Value literal;
+        Primitive primitive;
         String string;
         Array array;
         Fn *fn;

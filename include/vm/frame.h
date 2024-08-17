@@ -1,8 +1,8 @@
 #ifndef _FRAME_H_
 #define _FRAME_H_
 
-#include "holder.h"
 #include "value.h"
+#include "primitive.h"
 
 #include <essentials/dynarr.h>
 
@@ -14,7 +14,7 @@ typedef struct _frame_
     DynArr *chunks;
     Object *instance;
     char is_constructor;
-    Holder values[FRAME_VALUES_LENGTH];
+    Value locals[FRAME_VALUES_LENGTH];
 } Frame;
 
 #endif

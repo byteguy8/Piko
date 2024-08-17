@@ -1,22 +1,27 @@
 #ifndef _VALUE_H_
 #define _VALUE_H_
 
+#include "primitive.h"
+#include "object.h"
+
 #include <stdint.h>
 
-typedef enum _value_type_
+typedef enum _type_
 {
-    BOOL_VTYPE,
-    INT_VTYPE
-} ValueType;
+    NIL_HTYPE,
+    VALUE_HTYPE,
+    OBJECT_HTYPE
+} Type;
 
 typedef struct _value_
 {
-    enum _value_type_ type;
+    enum _type_ type;
 
     union
     {
-        int64_t i64;
-    };
+        Primitive primitive;
+        Object *object;
+    } entity;
 } Value;
 
 #endif

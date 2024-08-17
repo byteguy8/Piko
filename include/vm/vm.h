@@ -3,7 +3,7 @@
 
 #include "opcode.h"
 #include "frame.h"
-#include "holder.h"
+#include "value.h"
 #include "function.h"
 #include "klass.h"
 
@@ -39,7 +39,7 @@ typedef struct _vm_
     int rtn_code;
 
     int stack_ptr;
-    Holder stack[VM_STACK_LENGTH];
+    Value stack[VM_STACK_LENGTH];
 
     int frame_ptr;
     Frame frames[VM_FRAME_LENGTH];
