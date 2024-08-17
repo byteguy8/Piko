@@ -1217,7 +1217,7 @@ void compiler_klass_stmt(ClassStmt *stmt)
 
                 compiler_declare(0, param_token);
 
-                vm_fn_add_param(param, COMPILER_VM);
+                vm_klass_constructor_add_param(param, COMPILER_VM);
             }
         }
 
@@ -1262,7 +1262,7 @@ void compiler_klass_stmt(ClassStmt *stmt)
 
             compiler_declare(0, param_identifier_token);
 
-            vm_fn_add_param(param_identifier, COMPILER_VM);
+            vm_klass_fn_add_param(param_identifier, COMPILER_VM);
         }
 
         if (fn_stmts->used == 0)
