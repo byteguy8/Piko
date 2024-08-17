@@ -1148,6 +1148,12 @@ void compiler_fn_stmt(FnStmt *stmt)
         vm_fn_add_param(param_token->lexeme, COMPILER_VM);
     }
 
+    if (stmts->used == 0)
+    {
+        vm_write_chunk(NIL_OPC, COMPILER_VM);
+        vm_write_chunk(RET_OPC, COMPILER_VM);
+    }
+
     for (size_t i = 0; i < stmts->used; i++)
     {
         Stmt *stmt = (Stmt *)DYNARR_PTR_GET(i, stmts);
@@ -1215,6 +1221,12 @@ void compiler_klass_stmt(ClassStmt *stmt)
             }
         }
 
+        if (body->used == 0)
+        {
+            vm_write_chunk(NIL_OPC, COMPILER_VM);
+            vm_write_chunk(RET_OPC, COMPILER_VM);
+        }
+
         for (size_t stmt_index = 0; stmt_index < body->used; stmt_index++)
         {
             Stmt *stmt = DYNARR_PTR_GET(stmt_index, body);
@@ -1251,6 +1263,12 @@ void compiler_klass_stmt(ClassStmt *stmt)
             compiler_declare(0, param_identifier_token);
 
             vm_fn_add_param(param_identifier, COMPILER_VM);
+        }
+
+        if (fn_stmts->used == 0)
+        {
+            vm_write_chunk(NIL_OPC, COMPILER_VM);
+            vm_write_chunk(RET_OPC, COMPILER_VM);
         }
 
         for (size_t stmt_index = 0; stmt_index < fn_stmts->used; stmt_index++)
