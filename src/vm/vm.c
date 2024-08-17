@@ -28,8 +28,6 @@ static int is_str_int(char *str, size_t str_len)
     return 1;
 }
 
-// private interface
-
 //> native functions
 // strings
 static void native_fn_ascii(DynArr *args, VM *vm);
@@ -57,9 +55,14 @@ static void native_fn_read_file(DynArr *args, VM *vm);
 // sytem
 static void native_fn_panic(DynArr *args, VM *vm);
 static void native_fn_exit(DynArr *args, VM *vm);
+//< native functions
+
+// private interface
+static void _fn_start_(EntityInfoType type, char *name, VM *vm);
+static void _fn_end_(EntityInfoType type, VM *vm);
+static void _fn_add_param_(EntityInfoType type, char *param_name, VM *vm);
 
 void vm_add_native(char *name, char arity, void (*raw_native_fn)(DynArr *args, VM *), VM *vm);
-//< native functions
 
 static void _error_(char *msg, ...);
 void vm_err(char *msg, ...);
@@ -770,6 +773,175 @@ void vm_add_native(char *name, char arity, void (*raw_native_fn)(DynArr *args, V
     entity.raw_symbol = (void *)native_fn;
 
     dynarr_insert((void *)&entity, vm->entities);
+}
+
+void _fn_start_(EntityInfoType type, char *name, VM *vm)
+{
+    if (type == CONSTRUCTOR_ENTINFTYPE && vm->klass == NULL)
+        vm_err("Trying to start class constructor definition, but klass not present");
+
+    if (type == METHOD_ENTINFTYPE && vm->klass == NULL)
+        vm_err("Trying to start class method definition, but klass not present");
+
+    Fn *fn = vm_memory_create_fn(name);
+    EntityInfo *entity_info = (EntityInfo *)vm_memory_alloc(sizeof(EntityInfo));
+
+    entity_info->index = -1;
+    entity_info->raw_entity = fn;
+    entity_info->type = type;
+
+    if (type == FUNCTION_ENTINFTYPE)
+    {
+        entity_info->index = vm->entities->used;
+        dynarr_insert((void *)&((EntityInfo){0}), vm->entities);
+    }
+
+    lzstack_push((void *)fn->chunks, vm->blocks_stack, NULL);
+    lzstack_push((void *)entity_info, vm->fn_def_stack, NULL);
+}
+
+void _fn_end_(EntityInfoType type, VM *vm)
+{
+    if (type == CONSTRUCTOR_ENTINFTYPE && vm->klass == NULL)
+        vm_err("Trying to end class constructor definition, but klass not present");
+
+    if (type == METHOD_ENTINFTYPE && vm->klass == NULL)
+        vm_err("Trying to end class method definition, but klass not present");
+
+    EntityInfo *entity_info = (EntityInfo *)lzstack_pop(vm->fn_def_stack);
+
+    if (!entity_info)
+    {
+        switch (type)
+        {
+        case FUNCTION_ENTINFTYPE:
+            vm_err("Trying to end function definition, but stack is empty");
+            break;
+
+        case CONSTRUCTOR_ENTINFTYPE:
+            vm_err("Trying to end class constructor definition, but stack is empty");
+            break;
+
+        case METHOD_ENTINFTYPE:
+            vm_err("Trying to end class method definition, but stack is empty");
+            break;
+
+        default:
+            assert("Illegal entity type");
+        }
+    }
+
+    if (type != entity_info->type)
+    {
+        switch (type)
+        {
+        case FUNCTION_ENTINFTYPE:
+            vm_err("Trying to end function definition, but popped incorrent type");
+            break;
+
+        case CONSTRUCTOR_ENTINFTYPE:
+            vm_err("Trying to end class constructor definition, but popped incorrent type");
+            break;
+
+        case METHOD_ENTINFTYPE:
+            vm_err("Trying to end class method definition, but popped incorrent type");
+            break;
+
+        default:
+            assert("Illegal entity type");
+        }
+    }
+
+    lzstack_pop(vm->blocks_stack);
+
+    Fn *fn = (Fn *)entity_info->raw_entity;
+
+    switch (type)
+    {
+    case FUNCTION_ENTINFTYPE:
+        Entity entity = {0};
+
+        entity.raw_symbol = fn;
+        entity.type = FUNCTION_SYMTYPE;
+
+        dynarr_set((void *)&entity, entity_info->index, vm->entities);
+
+        break;
+
+    case CONSTRUCTOR_ENTINFTYPE:
+        vm->klass->constructor = fn;
+        break;
+
+    case METHOD_ENTINFTYPE:
+        char *key = fn->name;
+        size_t key_size = strlen(key);
+
+        lzhtable_put((uint8_t *)key, key_size, (void *)fn, vm->klass->methods, NULL);
+
+        break;
+
+    default:
+        assert("Illegal entity type");
+    }
+
+    vm_memory_dealloc(entity_info);
+}
+
+void _fn_add_param_(EntityInfoType type, char *param_name, VM *vm)
+{
+    if (type == CONSTRUCTOR_ENTINFTYPE && vm->klass == NULL)
+        vm_err("Trying to add parameter to class constructor, but klass not present");
+
+    if (type == METHOD_ENTINFTYPE && vm->klass == NULL)
+        vm_err("Trying to add parameter to class method, but klass not present");
+
+    EntityInfo *entity_info = (EntityInfo *)lzstack_peek(vm->fn_def_stack, NULL);
+
+    if (!entity_info)
+    {
+        switch (type)
+        {
+        case FUNCTION_ENTINFTYPE:
+            vm_err("Trying to add parameter to function, but stack is empty");
+            break;
+
+        case CONSTRUCTOR_ENTINFTYPE:
+            vm_err("Trying to add parameter to class constructor, but stack is empty");
+            break;
+
+        case METHOD_ENTINFTYPE:
+            vm_err("Trying to add parameter to class method, but stack is empty");
+            break;
+
+        default:
+            assert("Illegal entity type");
+        }
+    }
+
+    if (type != entity_info->type)
+    {
+        switch (type)
+        {
+        case FUNCTION_ENTINFTYPE:
+            vm_err("Trying to add parameter to function, but popped incorrent type");
+            break;
+
+        case CONSTRUCTOR_ENTINFTYPE:
+            vm_err("Trying to add parameter to class constructor, but popped incorrent type");
+            break;
+
+        case METHOD_ENTINFTYPE:
+            vm_err("Trying to add parameter to class method, but popped incorrent type");
+            break;
+
+        default:
+            assert("Illegal entity type");
+        }
+    }
+
+    Fn *fn = (Fn *)entity_info->raw_entity;
+
+    dynarr_ptr_insert((void *)vm_memory_clone_string(param_name), fn->params);
 }
 
 static void _error_(char *msg, ...)
@@ -3134,175 +3306,6 @@ void vm_print_stack(VM *vm)
         printf("%d: ", i + 1);
         vm_print_value(value);
     }
-}
-
-static void _fn_start_(EntityInfoType type, char *name, VM *vm)
-{
-    if (type == CONSTRUCTOR_ENTINFTYPE && vm->klass == NULL)
-        vm_err("Trying to start class constructor definition, but klass not present");
-
-    if (type == METHOD_ENTINFTYPE && vm->klass == NULL)
-        vm_err("Trying to start class method definition, but klass not present");
-
-    Fn *fn = vm_memory_create_fn(name);
-    EntityInfo *entity_info = (EntityInfo *)vm_memory_alloc(sizeof(EntityInfo));
-
-    entity_info->index = -1;
-    entity_info->raw_entity = fn;
-    entity_info->type = type;
-
-    if (type == FUNCTION_ENTINFTYPE)
-    {
-        entity_info->index = vm->entities->used;
-        dynarr_insert((void *)&((EntityInfo){0}), vm->entities);
-    }
-
-    lzstack_push((void *)fn->chunks, vm->blocks_stack, NULL);
-    lzstack_push((void *)entity_info, vm->fn_def_stack, NULL);
-}
-
-static void _fn_end_(EntityInfoType type, VM *vm)
-{
-    if (type == CONSTRUCTOR_ENTINFTYPE && vm->klass == NULL)
-        vm_err("Trying to end class constructor definition, but klass not present");
-
-    if (type == METHOD_ENTINFTYPE && vm->klass == NULL)
-        vm_err("Trying to end class method definition, but klass not present");
-
-    EntityInfo *entity_info = (EntityInfo *)lzstack_pop(vm->fn_def_stack);
-
-    if (!entity_info)
-    {
-        switch (type)
-        {
-        case FUNCTION_ENTINFTYPE:
-            vm_err("Trying to end function definition, but stack is empty");
-            break;
-
-        case CONSTRUCTOR_ENTINFTYPE:
-            vm_err("Trying to end class constructor definition, but stack is empty");
-            break;
-
-        case METHOD_ENTINFTYPE:
-            vm_err("Trying to end class method definition, but stack is empty");
-            break;
-
-        default:
-            assert("Illegal entity type");
-        }
-    }
-
-    if (type != entity_info->type)
-    {
-        switch (type)
-        {
-        case FUNCTION_ENTINFTYPE:
-            vm_err("Trying to end function definition, but popped incorrent type");
-            break;
-
-        case CONSTRUCTOR_ENTINFTYPE:
-            vm_err("Trying to end class constructor definition, but popped incorrent type");
-            break;
-
-        case METHOD_ENTINFTYPE:
-            vm_err("Trying to end class method definition, but popped incorrent type");
-            break;
-
-        default:
-            assert("Illegal entity type");
-        }
-    }
-
-    lzstack_pop(vm->blocks_stack);
-
-    Fn *fn = (Fn *)entity_info->raw_entity;
-
-    switch (type)
-    {
-    case FUNCTION_ENTINFTYPE:
-        Entity entity = {0};
-
-        entity.raw_symbol = fn;
-        entity.type = FUNCTION_SYMTYPE;
-
-        dynarr_set((void *)&entity, entity_info->index, vm->entities);
-
-        break;
-
-    case CONSTRUCTOR_ENTINFTYPE:
-        vm->klass->constructor = fn;
-        break;
-
-    case METHOD_ENTINFTYPE:
-        char *key = fn->name;
-        size_t key_size = strlen(key);
-
-        lzhtable_put((uint8_t *)key, key_size, (void *)fn, vm->klass->methods, NULL);
-
-        break;
-
-    default:
-        assert("Illegal entity type");
-    }
-
-    vm_memory_dealloc(entity_info);
-}
-
-static void _fn_add_param_(EntityInfoType type, char *param_name, VM *vm)
-{
-    if (type == CONSTRUCTOR_ENTINFTYPE && vm->klass == NULL)
-        vm_err("Trying to add parameter to class constructor, but klass not present");
-
-    if (type == METHOD_ENTINFTYPE && vm->klass == NULL)
-        vm_err("Trying to add parameter to class method, but klass not present");
-
-    EntityInfo *entity_info = (EntityInfo *)lzstack_peek(vm->fn_def_stack, NULL);
-
-    if (!entity_info)
-    {
-        switch (type)
-        {
-        case FUNCTION_ENTINFTYPE:
-            vm_err("Trying to add parameter to function, but stack is empty");
-            break;
-
-        case CONSTRUCTOR_ENTINFTYPE:
-            vm_err("Trying to add parameter to class constructor, but stack is empty");
-            break;
-
-        case METHOD_ENTINFTYPE:
-            vm_err("Trying to add parameter to class method, but stack is empty");
-            break;
-
-        default:
-            assert("Illegal entity type");
-        }
-    }
-
-    if (type != entity_info->type)
-    {
-        switch (type)
-        {
-        case FUNCTION_ENTINFTYPE:
-            vm_err("Trying to add parameter to function, but popped incorrent type");
-            break;
-
-        case CONSTRUCTOR_ENTINFTYPE:
-            vm_err("Trying to add parameter to class constructor, but popped incorrent type");
-            break;
-
-        case METHOD_ENTINFTYPE:
-            vm_err("Trying to add parameter to class method, but popped incorrent type");
-            break;
-
-        default:
-            assert("Illegal entity type");
-        }
-    }
-
-    Fn *fn = (Fn *)entity_info->raw_entity;
-
-    dynarr_ptr_insert((void *)vm_memory_clone_string(param_name), fn->params);
 }
 
 void vm_fn_start(char *name, VM *vm)
